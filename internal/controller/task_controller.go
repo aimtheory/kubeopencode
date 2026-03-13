@@ -75,6 +75,11 @@ To get Task status:
 `
 )
 
+// isTaskFinished returns true if the task phase is terminal (Completed or Failed).
+func isTaskFinished(phase kubeopenv1alpha1.TaskPhase) bool {
+	return phase == kubeopenv1alpha1.TaskPhaseCompleted || phase == kubeopenv1alpha1.TaskPhaseFailed
+}
+
 // TaskReconciler reconciles a Task object
 type TaskReconciler struct {
 	client.Client
@@ -123,8 +128,7 @@ func (r *TaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// If completed/failed, handle cleanup based on KubeOpenCodeConfig
-	if task.Status.Phase == kubeopenv1alpha1.TaskPhaseCompleted ||
-		task.Status.Phase == kubeopenv1alpha1.TaskPhaseFailed {
+	if isTaskFinished(task.Status.Phase) {
 		return r.handleTaskCleanup(ctx, task)
 	}
 
@@ -1325,8 +1329,7 @@ func (r *TaskReconciler) checkRetentionCleanup(ctx context.Context, namespace st
 	// Filter completed/failed Tasks with CompletionTime set
 	var completedTasks []kubeopenv1alpha1.Task
 	for _, t := range taskList.Items {
-		if (t.Status.Phase == kubeopenv1alpha1.TaskPhaseCompleted ||
-			t.Status.Phase == kubeopenv1alpha1.TaskPhaseFailed) &&
+		if isTaskFinished(t.Status.Phase) &&
 			t.Status.CompletionTime != nil {
 			completedTasks = append(completedTasks, t)
 		}
