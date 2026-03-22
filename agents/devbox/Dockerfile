@@ -77,11 +77,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g npm@latest
 
-# === Python 3 ===
+# === Python 3 + pipx ===
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    pipx \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
@@ -158,7 +159,7 @@ ENV WORKSPACE_DIR=${WORKSPACE_DIR}
 ENV GOPATH="/tmp/.go"
 ENV GOMODCACHE="/tmp/.gomodcache"
 ENV GOCACHE="/tmp/.cache/go-build"
-ENV PATH="/tmp/.go/bin:${PATH}"
+ENV PATH="/tmp/.local/bin:/tmp/.go/bin:${PATH}"
 
 # === Non-root User Setup (OpenShift Compatible) ===
 # OpenShift runs containers with arbitrary UIDs from a project-specific range.
