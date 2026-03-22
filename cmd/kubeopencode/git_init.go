@@ -15,18 +15,18 @@ import (
 
 // Environment variable names for git-init
 const (
-	envRepo            = "GIT_REPO"
-	envRef             = "GIT_REF"
-	envDepth           = "GIT_DEPTH"
-	envRoot            = "GIT_ROOT"
-	envLink            = "GIT_LINK"
-	envUsername        = "GIT_USERNAME"
-	envPassword        = "GIT_PASSWORD"
-	envSSHKey          = "GIT_SSH_KEY"
-	envSSHHostKeys     = "GIT_SSH_KNOWN_HOSTS"
-	envGitWorkspaceDir       = "GIT_WORKSPACE_DIR"
-	envGitRepoSubpath        = "GIT_REPO_SUBPATH"
-	envGitRecurseSubmodules  = "GIT_RECURSE_SUBMODULES"
+	envRepo                 = "GIT_REPO"
+	envRef                  = "GIT_REF"
+	envDepth                = "GIT_DEPTH"
+	envRoot                 = "GIT_ROOT"
+	envLink                 = "GIT_LINK"
+	envUsername             = "GIT_USERNAME"
+	envPassword             = "GIT_PASSWORD"
+	envSSHKey               = "GIT_SSH_KEY"
+	envSSHHostKeys          = "GIT_SSH_KNOWN_HOSTS"
+	envGitWorkspaceDir      = "GIT_WORKSPACE_DIR"
+	envGitRepoSubpath       = "GIT_REPO_SUBPATH"
+	envGitRecurseSubmodules = "GIT_RECURSE_SUBMODULES"
 )
 
 // Default values for git-init
