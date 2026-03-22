@@ -40,6 +40,10 @@ function TaskCreatePage() {
     const agentParam = searchParams.get('agent');
     if (agentParam) {
       setSelectedAgent(agentParam);
+      const agentNs = agentParam.split('/')[0];
+      if (agentNs) {
+        setNamespace(agentNs);
+      }
     }
   }, [searchParams]);
 
