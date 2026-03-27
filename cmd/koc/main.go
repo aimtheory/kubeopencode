@@ -1,6 +1,6 @@
 // Copyright Contributors to the KubeOpenCode project
 
-// koc is the KubeOpenCode CLI for interactive agent sessions.
+// KubeOpenCode CLI for interactive agent sessions.
 package main
 
 import (
@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	kubeopenv1alpha1 "github.com/kubeopencode/kubeopencode/api/v1alpha1"
 )
@@ -25,19 +27,35 @@ func init() {
 var rootCmd = &cobra.Command{
 	Use:   "koc",
 	Short: "KubeOpenCode CLI",
-	Long: `koc is the KubeOpenCode CLI for interactive agent sessions.
+	Long: `koc is the KubeOpenCode CLI for managing agents and interactive sessions.
 
 Commands:
-  agent attach    One-click attach to a server-mode agent (port-forward + TUI)
-  session watch   Stream agent events for a task (read-only)
-  session attach  Interactively attach to an agent session
+  get agents       List available agents across namespaces
+  agent attach     Attach to a server-mode agent via OpenCode TUI
 
-Install:
-  go install github.com/kubeopencode/kubeopencode/cmd/koc@latest
+Kubeconfig resolution (in priority order):
+  1. KUBEOPENCODE_KUBECONFIG environment variable
+  2. KUBECONFIG environment variable
+  3. Default ~/.kube/config
 
 Examples:
-  koc agent attach server-agent -n test
-  koc session watch my-task -n test`,
+  export KUBEOPENCODE_KUBECONFIG=/path/to/agent-cluster.kubeconfig
+  koc get agents
+  koc agent attach my-agent -n test`,
+}
+
+// getKubeConfig returns a rest.Config with the following priority:
+//  1. KUBEOPENCODE_KUBECONFIG env var (dedicated agent cluster config)
+//  2. KUBECONFIG env var
+//  3. Default ~/.kube/config
+func getKubeConfig() (*rest.Config, error) {
+	if path := os.Getenv("KUBEOPENCODE_KUBECONFIG"); path != "" {
+		return clientcmd.BuildConfigFromFlags("", path)
+	}
+	// Falls back to KUBECONFIG env var, then default path
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides).ClientConfig()
 }
 
 func main() {
