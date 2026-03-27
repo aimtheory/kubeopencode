@@ -333,8 +333,11 @@ function Layout() {
               }
               title="Agents"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="10" rx="2" />
+                <path d="M12 2a2 2 0 012 2v7H10V4a2 2 0 012-2z" />
+                <circle cx="8.5" cy="15.5" r="1.5" />
+                <circle cx="15.5" cy="15.5" r="1.5" />
               </svg>
             </NavLink>
 
