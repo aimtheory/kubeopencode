@@ -208,6 +208,52 @@ Kubernetes namespaces and RBAC (once the impersonation bug is fixed).
 - The fetch monkey-patch covers the standard `fetch()` API — only breaks if the SDK moves
   to a non-standard HTTP mechanism.
 
+### Threat 5: SSRF via Agent Status URL (MITIGATED)
+
+**Risk**: The reverse proxy resolves the upstream URL from `agent.Status.ServerStatus.URL`.
+Although the controller constructs safe URLs via `ServerURL()` (hardcoded `http://` scheme +
+`.svc.cluster.local` suffix), a compromised controller or direct status subresource patch
+could inject arbitrary URLs, enabling Server-Side Request Forgery against internal services
+(e.g., cloud metadata endpoints at `169.254.169.254`, internal dashboards).
+
+**Mitigation (implemented):**
+- Added `validateServerURL()` in `internal/server/handlers/common.go` that validates:
+  - Scheme must be `http` (rejects `https`, `ftp`, `file`, etc.)
+  - Host must end with `.svc.cluster.local` (rejects external hosts, IPs, localhost)
+  - No userinfo allowed (`user:pass@host` rejected)
+- Called in both `resolveAgentServerURL()` (used by web and proxy handlers) and
+  `getServerURL()` (used by HITL handler) — all proxy paths are covered.
+- 13 unit tests in `common_test.go` covering valid URLs, wrong scheme, external hosts,
+  cloud metadata endpoint, userinfo injection, etc.
+
+### Threat 6: Proxy Timeout Bypass (MITIGATED)
+
+**Risk**: `proxyToAgent()` uses `context.WithoutCancel()` to detach from chi's 60-second
+timeout middleware, which is necessary for SSE streams. However, in fallback mode, ALL
+requests (including static HTML/CSS/JS) are proxied through this path. If the upstream
+OpenCode server becomes unresponsive, non-SSE proxy requests would hang indefinitely.
+
+**Mitigation (implemented):**
+- Non-API paths (static assets) in the proxy now have a 2-minute timeout via
+  `context.WithTimeout()`. This prevents indefinite hangs while remaining generous enough
+  for large asset transfers.
+- API paths (potential SSE streams) remain unbounded — they terminate when the client
+  disconnects (write errors in `httputil.ReverseProxy`).
+- Added documentation comments explaining the `WithoutCancel` rationale.
+
+### Threat 7: New Tab Window Opener (MITIGATED)
+
+**Risk**: The "Open in new tab" feature uses `window.open()` to open the OpenCode Web UI
+in a separate browser tab. In older browsers, the opened tab retains a `window.opener`
+reference to the parent page, which could be used for tab-nabbing attacks (redirecting the
+parent page to a phishing URL).
+
+**Mitigation (implemented):**
+- All `window.open()` calls in `WebUIPanel.tsx` now pass `'noopener,noreferrer'` as the
+  third argument, severing the `window.opener` reference.
+- Modern browsers (Chrome 88+, Firefox 79+, Safari 12.1+) default to `noopener`, but
+  explicit specification ensures coverage for older browsers.
+
 ### Security Summary
 
 | Threat | Severity | Status | Owner |
@@ -216,6 +262,9 @@ Kubernetes namespaces and RBAC (once the impersonation bug is fixed).
 | RBAC bypass (clientContextKey bug) | ~~CRITICAL~~ FIXED | Exported `ClientContextKey` from handlers package | KubeOpenCode |
 | Multi-tenancy (shared sessions) | MEDIUM | By design; use namespace isolation | OpenCode |
 | Version drift | ~~LOW~~ MITIGATED | Self-hosting + version pinning + drift logging | KubeOpenCode |
+| SSRF via Agent Status URL | ~~HIGH~~ MITIGATED | `validateServerURL()` restricts to `http://*.svc.cluster.local` | KubeOpenCode |
+| Proxy timeout bypass | ~~HIGH~~ MITIGATED | 2-min timeout for non-API proxy paths; SSE remains unbounded | KubeOpenCode |
+| New tab window opener | ~~LOW~~ MITIGATED | `noopener,noreferrer` on all `window.open()` calls | KubeOpenCode |
 
 ## Consequences
 
@@ -502,7 +551,9 @@ To upgrade:
 | File | Description |
 |------|-------------|
 | `internal/server/handlers/agent_web_handler.go` | Self-hosted + fallback proxy handler, fetch patch |
-| `internal/server/handlers/agent_web_handler_test.go` | Unit tests |
+| `internal/server/handlers/agent_web_handler_test.go` | Unit tests for HTML rewriting, API path detection |
+| `internal/server/handlers/common.go` | Shared helpers: URL resolution, `validateServerURL()` |
+| `internal/server/handlers/common_test.go` | Unit tests for server URL validation (SSRF prevention) |
 | `internal/opencode-app/embed.go` | Embedded OpenCode Web UI assets |
 | `internal/opencode-app/dist/` | Built assets (populated by `make opencode-app-build`) |
 | `internal/server/server.go` | Route registration + RBAC fix (ClientContextKey) |

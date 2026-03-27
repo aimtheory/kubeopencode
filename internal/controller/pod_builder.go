@@ -851,6 +851,7 @@ func buildPod(task *kubeopenv1alpha1.Task, podName string, cfg agentConfig, cont
 		Name:            "agent",
 		Image:           executorImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
+		WorkingDir:      cfg.workspaceDir,
 		Command:         agentCommand,
 		Env:             envVars,
 		EnvFrom:         envFromSources,

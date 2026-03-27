@@ -15,14 +15,14 @@ function WebUIPanel({ namespace, agentName }: WebUIPanelProps) {
 
   const handleLaunch = useCallback(() => {
     if (window.innerWidth < 1024) {
-      window.open(webUIUrl, '_blank');
+      window.open(webUIUrl, '_blank', 'noopener,noreferrer');
     } else {
       setMode('expanded');
     }
   }, [webUIUrl]);
 
   const handleOpenNewTab = useCallback(() => {
-    window.open(webUIUrl, '_blank');
+    window.open(webUIUrl, '_blank', 'noopener,noreferrer');
   }, [webUIUrl]);
 
   // ESC key to exit maximized mode

@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,7 +58,33 @@ func resolveAgentServerURL(ctx context.Context, k8sClient client.Client, namespa
 		return "", fmt.Errorf("agent %q server is not ready (no server URL in status)", agentName)
 	}
 
-	return agent.Status.ServerStatus.URL, nil
+	serverURL := agent.Status.ServerStatus.URL
+	if err := validateServerURL(serverURL); err != nil {
+		return "", fmt.Errorf("agent %q has invalid server URL: %w", agentName, err)
+	}
+
+	return serverURL, nil
+}
+
+// validateServerURL ensures the URL points to an in-cluster Kubernetes service.
+// This prevents SSRF if the Agent status is tampered with (e.g., via direct
+// status patch or a compromised controller).
+func validateServerURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" {
+		return fmt.Errorf("URL scheme must be http, got %q", u.Scheme)
+	}
+	host := u.Hostname()
+	if !strings.HasSuffix(host, ".svc.cluster.local") {
+		return fmt.Errorf("URL host must be a cluster-local service, got %q", host)
+	}
+	if u.User != nil {
+		return fmt.Errorf("URL must not contain userinfo")
+	}
+	return nil
 }
 
 // normalizeProxyPath extracts and normalizes the wildcard path suffix from a chi route.

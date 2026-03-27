@@ -80,7 +80,12 @@ func (h *HITLHandler) getServerURL(ctx context.Context, namespace, taskName stri
 		return "", fmt.Errorf("agent %q server is not ready (no server URL in status)", agentName)
 	}
 
-	return agent.Status.ServerStatus.URL, nil
+	serverURL := agent.Status.ServerStatus.URL
+	if err := validateServerURL(serverURL); err != nil {
+		return "", fmt.Errorf("agent %q has invalid server URL: %w", agentName, err)
+	}
+
+	return serverURL, nil
 }
 
 // StreamEvents proxies SSE events from the OpenCode server to the client.

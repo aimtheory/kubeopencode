@@ -13,6 +13,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -156,7 +157,19 @@ func (h *AgentWebHandler) proxyToAgent(w http.ResponseWriter, r *http.Request, p
 	namespace := chi.URLParam(r, "namespace")
 	agentName := chi.URLParam(r, "name")
 
+	// Detach from chi's timeout context (60s) to support SSE and long-lived
+	// proxy responses. The proxy will still terminate when the client
+	// disconnects (httputil.ReverseProxy handles write errors).
 	ctx := context.WithoutCancel(r.Context())
+
+	// For non-API paths (e.g., static assets in fallback mode), add a timeout
+	// to prevent indefinite hangs if the upstream server becomes unresponsive.
+	// API paths may serve SSE streams and must remain unbounded.
+	if !isOpenCodeAPIPath(proxyPath) {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+	}
 
 	k8sClient := clientFromContext(ctx, h.defaultClient)
 	serverURL, err := resolveAgentServerURL(ctx, k8sClient, namespace, agentName)
