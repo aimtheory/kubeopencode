@@ -1750,6 +1750,13 @@ func TestBuildPod_ServerMode_WithAttachCommand(t *testing.T) {
 	if !strings.Contains(container.Command[2], "$(cat /workspace/task.md)") {
 		t.Errorf("Command should read task from /workspace/task.md")
 	}
+	// Verify the command includes --title with task name prefix
+	if !strings.Contains(container.Command[2], "--title") {
+		t.Errorf("Command should contain --title flag")
+	}
+	if !strings.Contains(container.Command[2], "test-task-") {
+		t.Errorf("Command --title should contain task name prefix 'test-task-'")
+	}
 }
 
 func TestBuildPod_PodMode_WithoutAttachCommand(t *testing.T) {
@@ -1791,6 +1798,13 @@ func TestBuildPod_PodMode_WithoutAttachCommand(t *testing.T) {
 	}
 	if !strings.Contains(container.Command[2], "/tools/opencode run") {
 		t.Errorf("Command should use /tools/opencode run")
+	}
+	// Verify the command includes --title with task name prefix
+	if !strings.Contains(container.Command[2], "--title") {
+		t.Errorf("Command should contain --title flag")
+	}
+	if !strings.Contains(container.Command[2], "test-task-") {
+		t.Errorf("Command --title should contain task name prefix 'test-task-'")
 	}
 }
 
@@ -1862,5 +1876,99 @@ func TestBuildPod_SetsOPENCODE_PERMISSIONWhenConfigHasNoPermission(t *testing.T)
 	}
 	if !foundPermissionEnv {
 		t.Errorf("OPENCODE_PERMISSION env var should be set when config has no permission field")
+	}
+}
+
+func TestBuildPod_SessionTitleDefaultsToTaskNameWithSuffix(t *testing.T) {
+	task := &kubeopenv1alpha1.Task{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-task",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+	task.APIVersion = "kubeopencode.io/v1alpha1"
+	task.Kind = "Task"
+
+	cfg := agentConfig{
+		agentImage:         "test-opencode:v1.0.0",
+		executorImage:      "test-executor:v1.0.0",
+		workspaceDir:       "/workspace",
+		serviceAccountName: "test-sa",
+	}
+
+	pod := buildPod(task, "my-task-pod", cfg, nil, nil, nil, nil, defaultSystemConfig(), "")
+	container := pod.Spec.Containers[0]
+
+	// Should contain task name prefix with random suffix
+	if !strings.Contains(container.Command[2], "'my-task-") {
+		t.Errorf("Command --title should start with task name 'my-task-', got: %s", container.Command[2])
+	}
+}
+
+func TestBuildPod_SessionTitleNotSetForCustomCommand(t *testing.T) {
+	task := &kubeopenv1alpha1.Task{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-task",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+	task.APIVersion = "kubeopencode.io/v1alpha1"
+	task.Kind = "Task"
+
+	cfg := agentConfig{
+		agentImage:         "test-opencode:v1.0.0",
+		executorImage:      "test-executor:v1.0.0",
+		workspaceDir:       "/workspace",
+		serviceAccountName: "test-sa",
+		command:            []string{"sh", "-c", "echo hello"},
+	}
+
+	pod := buildPod(task, "test-task-pod", cfg, nil, nil, nil, nil, defaultSystemConfig(), "")
+	container := pod.Spec.Containers[0]
+
+	// Custom command should not be modified
+	if strings.Contains(container.Command[2], "--title") {
+		t.Errorf("Custom command should NOT have --title injected")
+	}
+	if container.Command[2] != "echo hello" {
+		t.Errorf("Custom command should be preserved, got: %s", container.Command[2])
+	}
+}
+
+func TestShellEscape(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "'simple'"},
+		{"with space", "'with space'"},
+		{"it's", `'it'\''s'`},
+		{"a'b'c", `'a'\''b'\''c'`},
+		{"", "''"},
+	}
+	for _, tt := range tests {
+		got := shellEscape(tt.input)
+		if got != tt.want {
+			t.Errorf("shellEscape(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestSessionTitle(t *testing.T) {
+	task := &kubeopenv1alpha1.Task{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-task",
+		},
+	}
+	title := sessionTitle(task)
+	if !strings.HasPrefix(title, "my-task-") {
+		t.Errorf("sessionTitle should start with 'my-task-', got %q", title)
+	}
+	// 8 hex chars after the dash
+	suffix := strings.TrimPrefix(title, "my-task-")
+	if len(suffix) != 8 {
+		t.Errorf("sessionTitle suffix should be 8 hex chars, got %q (len=%d)", suffix, len(suffix))
 	}
 }

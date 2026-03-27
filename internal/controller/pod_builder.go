@@ -3,6 +3,8 @@
 package controller
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -819,6 +821,10 @@ func buildPod(task *kubeopenv1alpha1.Task, podName string, cfg agentConfig, cont
 	// Use custom command if provided, otherwise use default
 	agentCommand := cfg.command
 	if len(agentCommand) == 0 {
+		// Generate session title: task name + random suffix for uniqueness.
+		// This makes sessions identifiable in the OpenCode Web UI and enables
+		// future human-in-the-loop workflows (resuming sessions by title).
+		sessionTitle := sessionTitle(task)
 		if serverURL != "" {
 			// Server mode: use --attach flag to connect to existing OpenCode server.
 			// Tasks are non-interactive — all permissions are auto-allowed via
@@ -828,13 +834,13 @@ func buildPod(task *kubeopenv1alpha1.Task, podName string, cfg agentConfig, cont
 			// For interactive HITL sessions, users use `opencode attach` directly.
 			agentCommand = []string{
 				"sh", "-c",
-				fmt.Sprintf(`/tools/opencode run --attach %s "$(cat %s/task.md)"`, serverURL, cfg.workspaceDir),
+				fmt.Sprintf(`/tools/opencode run --attach %s --title %s "$(cat %s/task.md)"`, serverURL, shellEscape(sessionTitle), cfg.workspaceDir),
 			}
 		} else {
 			// Pod mode: run standalone OpenCode instance
 			agentCommand = []string{
 				"sh", "-c",
-				fmt.Sprintf(`/tools/opencode run "$(cat %s/task.md)"`, cfg.workspaceDir),
+				fmt.Sprintf(`/tools/opencode run --title %s "$(cat %s/task.md)"`, shellEscape(sessionTitle), cfg.workspaceDir),
 			}
 		}
 	}
@@ -925,4 +931,22 @@ func configHasPermission(config *string) bool {
 	}
 	_, ok := parsed["permission"]
 	return ok
+}
+
+// sessionTitle generates a session title for the OpenCode session.
+// Format: "{task-name}-{8-char-random-hex}"
+func sessionTitle(task *kubeopenv1alpha1.Task) string {
+	return fmt.Sprintf("%s-%s", task.Name, randomHex(4))
+}
+
+// randomHex returns a random hex string of n bytes (2n characters).
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// shellEscape wraps a string in single quotes for safe use in shell commands.
+func shellEscape(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
