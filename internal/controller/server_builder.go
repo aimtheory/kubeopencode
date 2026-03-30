@@ -10,6 +10,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -29,6 +30,24 @@ const (
 	// ServerHealthPath is the path used for readiness probes.
 	// OpenCode's /session/status endpoint returns 200 if the server is healthy.
 	ServerHealthPath = "/session/status"
+
+	// ServerSessionPVCSuffix is appended to Agent name for the session PVC name.
+	ServerSessionPVCSuffix = "-server-sessions"
+
+	// ServerSessionVolumeName is the volume name for the session PVC.
+	ServerSessionVolumeName = "session-data"
+
+	// ServerSessionMountPath is where the session PVC is mounted in the server container.
+	ServerSessionMountPath = "/data/sessions"
+
+	// ServerSessionDBPath is the full path to the OpenCode session database.
+	ServerSessionDBPath = ServerSessionMountPath + "/opencode.db"
+
+	// DefaultSessionPVCSize is the default size for the session PVC.
+	DefaultSessionPVCSize = "1Gi"
+
+	// OpenCodeDBEnvVar is the environment variable name for the OpenCode database path.
+	OpenCodeDBEnvVar = "OPENCODE_DB"
 )
 
 // ServerDeploymentName returns the Deployment name for a Server-mode Agent.
@@ -45,6 +64,58 @@ func ServerServiceName(agentName string) string {
 // ServerURL returns the in-cluster URL for a Server-mode Agent.
 func ServerURL(agentName, namespace string, port int32) string {
 	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", agentName, namespace, port)
+}
+
+// ServerSessionPVCName returns the PVC name for session persistence.
+func ServerSessionPVCName(agentName string) string {
+	return agentName + ServerSessionPVCSuffix
+}
+
+// BuildServerSessionPVC creates a PersistentVolumeClaim for session data persistence.
+// Returns (nil, nil) if session persistence is not configured.
+func BuildServerSessionPVC(agent *kubeopenv1alpha1.Agent) (*corev1.PersistentVolumeClaim, error) {
+	if agent.Spec.ServerConfig == nil ||
+		agent.Spec.ServerConfig.Persistence == nil ||
+		agent.Spec.ServerConfig.Persistence.Sessions == nil {
+		return nil, nil
+	}
+
+	sessions := agent.Spec.ServerConfig.Persistence.Sessions
+	size := sessions.Size
+	if size == "" {
+		size = DefaultSessionPVCSize
+	}
+
+	qty, err := resource.ParseQuantity(size)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session PVC size %q: %w", size, err)
+	}
+
+	labels := getServerLabels(agent.Name)
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ServerSessionPVCName(agent.Name),
+			Namespace: agent.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: qty,
+				},
+			},
+		},
+	}
+
+	if sessions.StorageClassName != nil {
+		pvc.Spec.StorageClassName = sessions.StorageClassName
+	}
+
+	return pvc, nil
 }
 
 // getServerLabels returns the common labels used by Server-mode resources.
@@ -126,6 +197,26 @@ func BuildServerDeployment(agent *kubeopenv1alpha1.Agent, agentCfg agentConfig, 
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+	}
+
+	// Add session persistence volume and env var if configured
+	if serverConfig.Persistence != nil && serverConfig.Persistence.Sessions != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: ServerSessionVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: ServerSessionPVCName(agent.Name),
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      ServerSessionVolumeName,
+			MountPath: ServerSessionMountPath,
+		})
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  OpenCodeDBEnvVar,
+			Value: ServerSessionDBPath,
+		})
 	}
 
 	// Add credentials (secrets as env vars or file mounts)

@@ -912,3 +912,270 @@ func TestBuildServerDeploymentWithCABundle(t *testing.T) {
 		t.Errorf("server container missing %s env var", CustomCACertEnvVar)
 	}
 }
+
+func TestBuildServerSessionPVC(t *testing.T) {
+	storageClass := "gp3"
+
+	tests := []struct {
+		name             string
+		serverConfig     *kubeopenv1alpha1.ServerConfig
+		wantNil          bool
+		wantSize         string
+		wantStorageClass *string
+	}{
+		{
+			name:         "no server config",
+			serverConfig: nil,
+			wantNil:      true,
+		},
+		{
+			name:         "no persistence",
+			serverConfig: &kubeopenv1alpha1.ServerConfig{Port: 4096},
+			wantNil:      true,
+		},
+		{
+			name: "persistence with nil sessions",
+			serverConfig: &kubeopenv1alpha1.ServerConfig{
+				Port:        4096,
+				Persistence: &kubeopenv1alpha1.PersistenceConfig{},
+			},
+			wantNil: true,
+		},
+		{
+			name: "sessions with defaults",
+			serverConfig: &kubeopenv1alpha1.ServerConfig{
+				Port: 4096,
+				Persistence: &kubeopenv1alpha1.PersistenceConfig{
+					Sessions: &kubeopenv1alpha1.VolumePersistence{},
+				},
+			},
+			wantNil:  false,
+			wantSize: DefaultSessionPVCSize,
+		},
+		{
+			name: "sessions with custom size and storage class",
+			serverConfig: &kubeopenv1alpha1.ServerConfig{
+				Port: 4096,
+				Persistence: &kubeopenv1alpha1.PersistenceConfig{
+					Sessions: &kubeopenv1alpha1.VolumePersistence{
+						Size:             "5Gi",
+						StorageClassName: &storageClass,
+					},
+				},
+			},
+			wantNil:          false,
+			wantSize:         "5Gi",
+			wantStorageClass: &storageClass,
+		},
+	}
+
+	// Test invalid size returns error instead of panicking
+	t.Run("invalid size returns error", func(t *testing.T) {
+		agent := &kubeopenv1alpha1.Agent{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-agent",
+				Namespace: "default",
+			},
+			Spec: kubeopenv1alpha1.AgentSpec{
+				ServerConfig: &kubeopenv1alpha1.ServerConfig{
+					Port: 4096,
+					Persistence: &kubeopenv1alpha1.PersistenceConfig{
+						Sessions: &kubeopenv1alpha1.VolumePersistence{
+							Size: "invalid-size",
+						},
+					},
+				},
+			},
+		}
+		pvc, err := BuildServerSessionPVC(agent)
+		if err == nil {
+			t.Fatal("expected error for invalid size, got nil")
+		}
+		if pvc != nil {
+			t.Fatal("expected nil PVC on error")
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := &kubeopenv1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-agent",
+					Namespace: "default",
+				},
+				Spec: kubeopenv1alpha1.AgentSpec{
+					ServerConfig: tt.serverConfig,
+				},
+			}
+
+			pvc, err := BuildServerSessionPVC(agent)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.wantNil {
+				if pvc != nil {
+					t.Fatalf("expected nil PVC, got %v", pvc)
+				}
+				return
+			}
+
+			if pvc == nil {
+				t.Fatal("expected non-nil PVC")
+			}
+
+			// Verify name
+			expectedName := "test-agent" + ServerSessionPVCSuffix
+			if pvc.Name != expectedName {
+				t.Errorf("PVC name = %q, want %q", pvc.Name, expectedName)
+			}
+
+			// Verify namespace
+			if pvc.Namespace != "default" {
+				t.Errorf("PVC namespace = %q, want %q", pvc.Namespace, "default")
+			}
+
+			// Verify access mode
+			if len(pvc.Spec.AccessModes) != 1 || pvc.Spec.AccessModes[0] != corev1.ReadWriteOnce {
+				t.Errorf("PVC access modes = %v, want [ReadWriteOnce]", pvc.Spec.AccessModes)
+			}
+
+			// Verify size
+			storageReq := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+			if storageReq.String() != tt.wantSize {
+				t.Errorf("PVC size = %q, want %q", storageReq.String(), tt.wantSize)
+			}
+
+			// Verify storage class
+			if tt.wantStorageClass != nil {
+				if pvc.Spec.StorageClassName == nil || *pvc.Spec.StorageClassName != *tt.wantStorageClass {
+					t.Errorf("PVC storageClassName = %v, want %q", pvc.Spec.StorageClassName, *tt.wantStorageClass)
+				}
+			} else {
+				if pvc.Spec.StorageClassName != nil {
+					t.Errorf("PVC storageClassName = %q, want nil", *pvc.Spec.StorageClassName)
+				}
+			}
+
+			// Verify labels
+			if pvc.Labels[AgentLabelKey] != "test-agent" {
+				t.Errorf("PVC agent label = %q, want %q", pvc.Labels[AgentLabelKey], "test-agent")
+			}
+		})
+	}
+}
+
+func TestBuildServerDeployment_WithSessionPersistence(t *testing.T) {
+	agent := &kubeopenv1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-agent",
+			Namespace: "default",
+		},
+		Spec: kubeopenv1alpha1.AgentSpec{
+			ServerConfig: &kubeopenv1alpha1.ServerConfig{
+				Port: 4096,
+				Persistence: &kubeopenv1alpha1.PersistenceConfig{
+					Sessions: &kubeopenv1alpha1.VolumePersistence{
+						Size: "2Gi",
+					},
+				},
+			},
+		},
+	}
+
+	cfg := agentConfig{
+		executorImage: "test-executor:v1.0.0",
+		agentImage:    "test-agent:v1.0.0",
+		workspaceDir:  "/workspace",
+	}
+
+	deployment := BuildServerDeployment(agent, cfg, defaultSystemConfig(), nil, nil, nil, nil)
+	if deployment == nil {
+		t.Fatal("BuildServerDeployment returned nil")
+	}
+
+	// Verify session PVC volume exists
+	var foundVolume bool
+	for _, vol := range deployment.Spec.Template.Spec.Volumes {
+		if vol.Name == ServerSessionVolumeName {
+			foundVolume = true
+			if vol.PersistentVolumeClaim == nil {
+				t.Error("session volume should be a PVC")
+			} else if vol.PersistentVolumeClaim.ClaimName != ServerSessionPVCName("test-agent") {
+				t.Errorf("PVC claim name = %q, want %q", vol.PersistentVolumeClaim.ClaimName, ServerSessionPVCName("test-agent"))
+			}
+		}
+	}
+	if !foundVolume {
+		t.Error("session PVC volume not found")
+	}
+
+	// Verify session volume mount exists on server container
+	container := deployment.Spec.Template.Spec.Containers[0]
+	var foundMount bool
+	for _, mount := range container.VolumeMounts {
+		if mount.Name == ServerSessionVolumeName {
+			foundMount = true
+			if mount.MountPath != ServerSessionMountPath {
+				t.Errorf("mount path = %q, want %q", mount.MountPath, ServerSessionMountPath)
+			}
+		}
+	}
+	if !foundMount {
+		t.Error("session volume mount not found on server container")
+	}
+
+	// Verify OPENCODE_DB env var
+	var foundEnv bool
+	for _, env := range container.Env {
+		if env.Name == OpenCodeDBEnvVar {
+			foundEnv = true
+			if env.Value != ServerSessionDBPath {
+				t.Errorf("%s = %q, want %q", OpenCodeDBEnvVar, env.Value, ServerSessionDBPath)
+			}
+		}
+	}
+	if !foundEnv {
+		t.Errorf("%s env var not found", OpenCodeDBEnvVar)
+	}
+}
+
+func TestBuildServerDeployment_WithoutSessionPersistence(t *testing.T) {
+	agent := &kubeopenv1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-agent",
+			Namespace: "default",
+		},
+		Spec: kubeopenv1alpha1.AgentSpec{
+			ServerConfig: &kubeopenv1alpha1.ServerConfig{
+				Port: 4096,
+			},
+		},
+	}
+
+	cfg := agentConfig{
+		executorImage: "test-executor:v1.0.0",
+		agentImage:    "test-agent:v1.0.0",
+		workspaceDir:  "/workspace",
+	}
+
+	deployment := BuildServerDeployment(agent, cfg, defaultSystemConfig(), nil, nil, nil, nil)
+	if deployment == nil {
+		t.Fatal("BuildServerDeployment returned nil")
+	}
+
+	// Verify no session PVC volume
+	for _, vol := range deployment.Spec.Template.Spec.Volumes {
+		if vol.Name == ServerSessionVolumeName {
+			t.Error("session PVC volume should not be present without persistence config")
+		}
+	}
+
+	// Verify no OPENCODE_DB env var
+	container := deployment.Spec.Template.Spec.Containers[0]
+	for _, env := range container.Env {
+		if env.Name == OpenCodeDBEnvVar {
+			t.Errorf("%s env var should not be present without persistence config", OpenCodeDBEnvVar)
+		}
+	}
+}

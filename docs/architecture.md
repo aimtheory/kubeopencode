@@ -814,6 +814,20 @@ Task Controller
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `port` | int32 | 4096 | Port for OpenCode server |
+| `persistence` | PersistenceConfig | nil | Persistent storage configuration |
+
+**PersistenceConfig Fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `sessions` | VolumePersistence | nil | Session data (SQLite DB) persistence |
+
+**VolumePersistence Fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `storageClassName` | *string | cluster default | StorageClass for the PVC |
+| `size` | string | 1Gi | PVC storage size |
 
 **Server Mode Status:**
 

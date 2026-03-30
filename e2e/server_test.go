@@ -712,4 +712,125 @@ var _ = Describe("Server Mode E2E Tests", Label(LabelServer), func() {
 			Expect(k8sClient.Delete(ctx, agent)).Should(Succeed())
 		})
 	})
+
+	Context("Server Mode Agent - Session Persistence", func() {
+		It("should create a PVC when session persistence is configured", func() {
+			agentName := uniqueName("session-persist")
+
+			By("Creating Agent with session persistence")
+			agent := &kubeopenv1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      agentName,
+					Namespace: testNS,
+				},
+				Spec: kubeopenv1alpha1.AgentSpec{
+					ExecutorImage:      echoImage,
+					ServiceAccountName: testServiceAccount,
+					WorkspaceDir:       "/workspace",
+					ServerConfig: &kubeopenv1alpha1.ServerConfig{
+						Port: 4096,
+						Persistence: &kubeopenv1alpha1.PersistenceConfig{
+							Sessions: &kubeopenv1alpha1.VolumePersistence{
+								Size: "1Gi",
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).Should(Succeed())
+
+			By("Waiting for session PVC to be created")
+			pvcName := controller.ServerSessionPVCName(agentName)
+			pvcKey := types.NamespacedName{Name: pvcName, Namespace: testNS}
+			Eventually(func() bool {
+				pvc := &corev1.PersistentVolumeClaim{}
+				return k8sClient.Get(ctx, pvcKey, pvc) == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Verifying PVC properties")
+			pvc := &corev1.PersistentVolumeClaim{}
+			Expect(k8sClient.Get(ctx, pvcKey, pvc)).Should(Succeed())
+			Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
+			storageReq := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+			Expect(storageReq.String()).To(Equal("1Gi"))
+
+			By("Waiting for Deployment to be created with session volume")
+			deploymentName := controller.ServerDeploymentName(agentName)
+			deploymentKey := types.NamespacedName{Name: deploymentName, Namespace: testNS}
+			Eventually(func() bool {
+				deployment := &appsv1.Deployment{}
+				if err := k8sClient.Get(ctx, deploymentKey, deployment); err != nil {
+					return false
+				}
+				// Check for session PVC volume
+				for _, vol := range deployment.Spec.Template.Spec.Volumes {
+					if vol.Name == controller.ServerSessionVolumeName &&
+						vol.PersistentVolumeClaim != nil &&
+						vol.PersistentVolumeClaim.ClaimName == pvcName {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("Verifying OPENCODE_DB env var in Deployment")
+			deployment := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, deploymentKey, deployment)).Should(Succeed())
+			container := deployment.Spec.Template.Spec.Containers[0]
+			var foundDBEnv bool
+			for _, env := range container.Env {
+				if env.Name == controller.OpenCodeDBEnvVar && env.Value == controller.ServerSessionDBPath {
+					foundDBEnv = true
+				}
+			}
+			Expect(foundDBEnv).To(BeTrue(), "OPENCODE_DB env var not found in server container")
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, agent)).Should(Succeed())
+
+			By("Verifying PVC is cleaned up with Agent (via OwnerReference)")
+			Eventually(func() bool {
+				pvc := &corev1.PersistentVolumeClaim{}
+				return k8sClient.Get(ctx, pvcKey, pvc) != nil
+			}, timeout, interval).Should(BeTrue())
+		})
+
+		It("should NOT create a PVC when persistence is not configured", func() {
+			agentName := uniqueName("no-persist")
+
+			By("Creating Agent without persistence")
+			agent := &kubeopenv1alpha1.Agent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      agentName,
+					Namespace: testNS,
+				},
+				Spec: kubeopenv1alpha1.AgentSpec{
+					ExecutorImage:      echoImage,
+					ServiceAccountName: testServiceAccount,
+					WorkspaceDir:       "/workspace",
+					ServerConfig: &kubeopenv1alpha1.ServerConfig{
+						Port: 4096,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, agent)).Should(Succeed())
+
+			By("Waiting for Deployment (confirms controller processed the Agent)")
+			deploymentKey := types.NamespacedName{Name: controller.ServerDeploymentName(agentName), Namespace: testNS}
+			Eventually(func() bool {
+				deployment := &appsv1.Deployment{}
+				return k8sClient.Get(ctx, deploymentKey, deployment) == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Verifying NO PVC was created")
+			pvcKey := types.NamespacedName{Name: controller.ServerSessionPVCName(agentName), Namespace: testNS}
+			Consistently(func() bool {
+				pvc := &corev1.PersistentVolumeClaim{}
+				return k8sClient.Get(ctx, pvcKey, pvc) != nil
+			}, timeout/2, interval).Should(BeTrue())
+
+			By("Cleaning up")
+			Expect(k8sClient.Delete(ctx, agent)).Should(Succeed())
+		})
+	})
 })
