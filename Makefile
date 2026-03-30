@@ -93,7 +93,7 @@ build:
 
 # Build KubeOpenCode CLI binary
 build-cli:
-	go build -ldflags '$(GO_LD_FLAGS)' -o bin/kubeopencode-cli ./cmd/cli
+	go build -ldflags '$(GO_LD_FLAGS)' -o bin/kubeoc ./cmd/kubeoc
 .PHONY: build-cli
 
 # Test runs unit tests only.
