@@ -4,11 +4,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sort"
 
 	"github.com/go-chi/chi/v5"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kubeopenv1alpha1 "github.com/kubeopencode/kubeopencode/api/v1alpha1"
@@ -234,6 +236,61 @@ func agentToResponse(agent *kubeopenv1alpha1.Agent) types.AgentResponse {
 	resp.Contexts = contextsToItems(agent.Spec.Contexts)
 
 	return resp
+}
+
+// Create creates a new agent
+func (h *AgentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	namespace := chi.URLParam(r, "namespace")
+	ctx := r.Context()
+	k8sClient := h.getClient(ctx)
+
+	var req types.CreateAgentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "Name is required", "")
+		return
+	}
+	if req.WorkspaceDir == "" {
+		writeError(w, http.StatusBadRequest, "WorkspaceDir is required", "")
+		return
+	}
+	if req.ServiceAccountName == "" {
+		writeError(w, http.StatusBadRequest, "ServiceAccountName is required", "")
+		return
+	}
+
+	agent := &kubeopenv1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Name,
+			Namespace: namespace,
+		},
+		Spec: kubeopenv1alpha1.AgentSpec{
+			Profile:            req.Profile,
+			WorkspaceDir:       req.WorkspaceDir,
+			ServiceAccountName: req.ServiceAccountName,
+		},
+	}
+
+	if req.TemplateRef != nil {
+		agent.Spec.TemplateRef = &kubeopenv1alpha1.AgentTemplateReference{
+			Name: req.TemplateRef.Name,
+		}
+	}
+
+	if err := k8sClient.Create(ctx, agent); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			writeError(w, http.StatusConflict, "Agent already exists", err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to create agent", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, agentToResponse(agent))
 }
 
 // Suspend scales the server deployment to 0 replicas.

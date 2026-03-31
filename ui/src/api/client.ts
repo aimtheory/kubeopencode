@@ -59,6 +59,14 @@ export interface CreateTaskRequest {
   agentRef?: AgentReference;
 }
 
+export interface CreateAgentRequest {
+  name: string;
+  profile?: string;
+  templateRef?: AgentReference;
+  workspaceDir: string;
+  serviceAccountName: string;
+}
+
 export interface ContextItem {
   name?: string;
   description?: string;
@@ -290,6 +298,12 @@ export const api = {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.text();
   },
+
+  createAgent: (namespace: string, agent: CreateAgentRequest) =>
+    request<Agent>(`/namespaces/${namespace}/agents`, {
+      method: 'POST',
+      body: JSON.stringify(agent),
+    }),
 
   suspendAgent: (namespace: string, name: string) =>
     request<Agent>(`/namespaces/${namespace}/agents/${name}/suspend`, { method: 'POST' }),

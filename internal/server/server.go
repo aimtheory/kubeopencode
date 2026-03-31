@@ -203,6 +203,7 @@ func (s *Server) setupRoutes() *chi.Mux {
 		r.Get("/agents", agentHandler.ListAll)
 		r.Route("/namespaces/{namespace}/agents", func(r chi.Router) {
 			r.Get("/", agentHandler.List)
+			r.Post("/", agentHandler.Create)
 			r.Get("/{name}", agentHandler.Get)
 			r.Post("/{name}/suspend", agentHandler.Suspend)
 			r.Post("/{name}/resume", agentHandler.Resume)
