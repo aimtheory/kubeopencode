@@ -10,39 +10,17 @@ This document provides guidelines for AI assistants (like Claude) working on the
 
 KubeOpenCode brings Agentic AI capabilities into the Kubernetes ecosystem. By leveraging Kubernetes, it enables AI agents to be deployed as services, run in isolated virtual environments, and integrate with enterprise management and governance frameworks.
 
-**Local OpenCode Source Code:**
+> **IMPORTANT FOR AI ASSISTANTS**: The OpenCode project source code is located at `../opencode/` (sibling directory to kubeopencode). Always prioritize searching the local OpenCode codebase first before using web search.
 
-> **IMPORTANT FOR AI ASSISTANTS**: The OpenCode project source code is located at `../opencode/` (sibling directory to kubeopencode). When answering questions about OpenCode's code, implementation details, or internal behavior, **always prioritize searching the local OpenCode codebase first** before using web search or making assumptions.
-
-**Key Technologies:**
-- Kubernetes Custom Resource Definitions (CRDs)
-- Controller Runtime (kubebuilder)
-- Go 1.25
-- Helm for deployment
+**Key Technologies:** Go 1.25, Kubernetes CRDs, Controller Runtime (kubebuilder), Helm
 
 **Architecture Philosophy:**
-- No external dependencies (no PostgreSQL, Redis)
-- Kubernetes-native (uses etcd for state, Pods for execution)
-- Declarative and GitOps-friendly
+- No external dependencies (no PostgreSQL, Redis) — Kubernetes-native (etcd for state, Pods for execution)
 - Simple API: Task (WHAT to do) + Agent (HOW to execute)
 - Use Helm/Kustomize for batch operations (multiple Tasks)
+- Event-driven triggers delegated to [Argo Events](https://argoproj.github.io/argo-events/)
 
-**Unified Binary:**
-
-KubeOpenCode uses a single container image (`quay.io/kubeopencode/kubeopencode`) with multiple subcommands:
-
-| Subcommand | Used For |
-|------------|----------|
-| `controller` | Main controller reconciliation |
-| `git-init` | Git Context cloning (init container) |
-| `context-init` | Context file initialization (init container) |
-| `url-fetch` | URL Context fetching (init container) |
-
-The image constant is defined in `internal/controller/pod_builder.go` as `DefaultKubeOpenCodeImage`.
-
-**Event-Driven Triggers (Argo Events):**
-
-Webhook/event handling has been delegated to [Argo Events](https://argoproj.github.io/argo-events/). See the [kubeopencode/dogfooding](https://github.com/kubeopencode/dogfooding) repository for examples of GitHub webhook integration using EventSource and Sensor resources that create KubeOpenCode Tasks.
+**Unified Binary:** Single container image (`quay.io/kubeopencode/kubeopencode`) with subcommands: `controller`, `git-init`, `context-init`, `url-fetch`. Image constant: `internal/controller/pod_builder.go` → `DefaultKubeOpenCodeImage`.
 
 ## Core Concepts
 
@@ -51,1022 +29,229 @@ Webhook/event handling has been delegated to [Argo Events](https://argoproj.gith
 1. **Task** - Single task execution (the primary API)
 2. **Agent** - AI agent configuration (HOW to execute)
 3. **AgentTemplate** - Reusable base configuration for Agents (optional)
-4. **KubeOpenCodeConfig** - Cluster-scoped system-level configuration (optional)
-
-> **Note**: Workflow orchestration and webhook triggers have been delegated to Argo Workflows and Argo Events respectively. KubeOpenCode focuses on the core Task/Agent abstraction.
+4. **KubeOpenCodeConfig** - Cluster-scoped system-level configuration (optional, singleton named `cluster`)
 
 ### Important Design Decisions
 
 - **Agent** (not KubeOpenCodeConfig) - Stable, project-independent naming
-- **AgentImage** (not AgentTemplateRef) - Simple container image, controller generates Pods
-- **agentRef** - Reference from Task to Agent
-- **No Batch/BatchRun** - Use Helm/Kustomize to create multiple Tasks (Kubernetes-native approach)
+- **agentRef** - Required reference from Task to Agent (same namespace)
+- **No Batch/BatchRun** - Use Helm/Kustomize (Kubernetes-native approach)
+- **Two-container pattern**: Init container (`agentImage`) copies OpenCode binary to `/tools`, Worker container (`executorImage`) runs tasks
 
 ### Context System
 
-Tasks and Agents use inline **ContextItem** to provide additional context:
+Tasks and Agents use inline **ContextItem** for additional context. Types: Text, ConfigMap, Git, Runtime, URL.
 
-**Context Types:**
-- **Text**: Inline text content (`type: Text`, `text: "..."`)
-- **ConfigMap**: Content from ConfigMap (`type: ConfigMap`, `configMap.name`, optional `configMap.key`)
-- **Git**: Content from Git repository (`type: Git`, `git.repository`, `git.ref`, optional `git.secretRef`)
-- **Runtime**: KubeOpenCode platform awareness system prompt (`type: Runtime`)
-- **URL**: Content from remote HTTP/HTTPS URL (`type: URL`, `url.source`, requires `mountPath`)
+Key behaviors:
+- Empty `mountPath` → content written to `${WORKSPACE_DIR}/.kubeopencode/context.md` with XML tags
+- Relative paths prefixed with `workspaceDir`; absolute paths used as-is
 
-**ContextItem** fields:
-- `name`: Optional identifier for logging, debugging, and XML tag generation
-- `description`: Human-readable documentation for this context
-- `optional`: If true, task proceeds even if context cannot be resolved
-- `type`: Context type (Text, ConfigMap, Git, Runtime, URL)
-- `mountPath`: Where to mount (empty = write to `.kubeopencode/context.md`)
-  - When empty: Content is written to `${WORKSPACE_DIR}/.kubeopencode/context.md` with XML tags.
-    OpenCode loads this via `OPENCODE_CONFIG_CONTENT` env var, avoiding conflicts with repo's `AGENTS.md`
-  - Path resolution follows Tekton conventions:
-    - Absolute paths (`/etc/config`) are used as-is
-    - Relative paths (`guides/readme.md`) are prefixed with workspaceDir
-- `fileMode`: Optional file permission mode (e.g., 493 for 0755)
+> See `docs/features.md` for detailed context examples and field reference.
 
-**Example:**
-```yaml
-contexts:
-  - name: coding-standards
-    description: "Organization coding standards"
-    type: Text
-    text: |
-      # Rules for AI Agent
-      Always use signed commits...
-  - name: scripts
-    type: ConfigMap
-    configMap:
-      name: my-scripts
-    mountPath: .scripts
-    fileMode: 493  # 0755 in decimal
-  - name: source
-    type: Git
-    git:
-      repository: https://github.com/org/repo.git
-      ref: main
-    mountPath: source-code
-  - name: api-spec
-    type: URL
-    url:
-      source: https://api.example.com/openapi.yaml
-    mountPath: specs/openapi.yaml
-```
+### Agent Configuration (Summary)
 
-**Future**: MCP contexts (extensible design)
+Key Agent spec fields: `templateRef`, `profile`, `agentImage`, `executorImage`, `command` (optional, has default), `workspaceDir` (required), `contexts`, `config` (inline JSON → `/tools/opencode.json`), `credentials`, `caBundle`, `proxy`, `imagePullSecrets`, `podSpec`, `serviceAccountName`, `maxConcurrentTasks`, `quota`, `serverConfig`.
+
+> See `docs/features.md` for detailed YAML examples of Agent configuration, proxy, credentials, concurrency, quota, and server mode.
+
+### AgentTemplate
+
+Reusable base configuration referenced by Agents via `spec.templateRef.name`. Merge strategy: Agent wins for scalars; Agent **replaces** template for lists. Agent-only fields: `profile`, `maxConcurrentTasks`, `quota`, `templateRef`.
+
+> See `docs/architecture.md` for AgentTemplate spec fields and merge details.
+
+### Server Mode
+
+Agents support **Pod mode** (default, new Pod per Task) and **Server mode** (persistent Deployment + Service). Enabled by adding `serverConfig` to Agent spec. Supports persistence (sessions/workspace PVCs) and suspend/resume.
+
+> See `docs/features.md` for Server Mode setup, persistence, suspend/resume, and comparison table.
+
+### Task Stop
+
+Stop running Tasks via annotation: `kubectl annotate task <name> kubeopencode.io/stop=true`. Prefer this over `kubectl delete task`. Logs are lost when stopped.
+
+### Task Cleanup
+
+Automatic cleanup via `KubeOpenCodeConfig` (cluster-scoped singleton named `cluster`): `ttlSecondsAfterFinished` and/or `maxRetainedTasks` per namespace.
 
 ## Code Standards
 
 ### File Headers
 
-All Go files must include the copyright header:
-
+All Go files must include:
 ```go
 // Copyright Contributors to the KubeOpenCode project
 ```
 
 ### Naming Conventions
 
-1. **API Resources**: Use semantic names independent of project name
-   - Good: `Agent`, `AgentTemplateRef`
-   - Avoid: `KubeOpenCodeConfig`, `JobTemplateRef`
-
-2. **Go Code**: Follow standard Go conventions
-   - Package names: lowercase, single word
-   - Exported types: PascalCase
-   - Unexported: camelCase
-
-3. **Kubernetes Resources**:
-   - CRD Group: `kubeopencode.io`
-   - API Version: `v1alpha1`
-   - Kinds: `Task`, `Agent`, `KubeOpenCodeConfig`
+- **API Resources**: Semantic names (`Agent`, not `KubeOpenCodeConfig`)
+- **Go Code**: Standard Go conventions (PascalCase exported, camelCase unexported)
+- **CRD Group**: `kubeopencode.io`, API Version: `v1alpha1`
 
 ### Code Comments
 
 - Write all comments in English
-- Document exported types and functions
-- Use godoc format for package documentation
-- Include examples in comments where helpful
+- Use godoc format for exported types/functions
 
 ## Development Workflow
 
 ### Building and Testing
 
 ```bash
-# Build the controller
-make build
-
-# Run tests
-make test
-
-# Run linter
-make lint
-
-# Update generated code (CRDs, deepcopy)
-make update
-
-# Verify generated code is up to date
-make verify
-```
-
-### Local Development
-
-```bash
-# Run controller locally (requires kubeconfig)
-make run
-
-# Format code
-make fmt
+make build          # Build controller
+make test           # Run unit tests
+make lint           # Run linter
+make update         # Regenerate CRDs and deepcopy
+make verify         # Verify generated code is up to date
+make run            # Run controller locally
+make fmt            # Format code
 ```
 
 ### E2E Testing
 
-> **Note**: E2E commands (`e2e-*`) are for **local Kind clusters only**. For remote clusters (OpenShift, EKS, GKE, etc.), use `docker-buildx` to build and push images, then `kubectl rollout restart` to update deployments.
+> **CRITICAL**: E2E commands are for **local Kind clusters only**. For remote clusters, use `docker-buildx` + `kubectl rollout restart`.
 
-> **CRITICAL FOR AI ASSISTANTS**: When the user asks to run "e2e tests", "e2e testing", "test e2e", or any variation, you MUST execute all three commands in sequence. NEVER run `make e2e-test` alone - this will cause failures due to stale cluster state.
-
-**Required E2E test flow** (always execute all three steps):
+> **CRITICAL**: NEVER run `make e2e-test` alone. Always execute all three steps:
 
 ```bash
-# Step 1: Clean up existing Kind cluster
-make e2e-teardown
-
-# Step 2: Setup complete e2e environment
-make e2e-setup
-
-# Step 3: Run e2e tests
-make e2e-test
+make e2e-teardown   # Step 1: Clean up existing Kind cluster
+make e2e-setup      # Step 2: Setup complete e2e environment
+make e2e-test       # Step 3: Run e2e tests
 ```
 
-For iterative e2e testing only (when you've already run the full flow once in this session):
+For iterative e2e testing (after full flow ran once in this session):
 ```bash
-make e2e-reload  # Rebuild and reload controller image, then run e2e-test
+make e2e-reload     # Rebuild + reload controller image + run e2e-test
 ```
 
-> **CRITICAL FOR AI ASSISTANTS**: The `e2e-reload` command is ONLY for e2e testing scenarios (`make e2e-test`). It uses a hardcoded Kind cluster name (`kubeopencode`) and runs e2e tests after reloading. Do NOT use `e2e-reload` for local-development testing. For local-development, follow the manual steps in `deploy/local-dev/local-development.md`:
+> **CRITICAL**: `e2e-reload` is ONLY for e2e testing (hardcoded Kind cluster `kubeopencode`). For local-dev, follow `deploy/local-dev/local-development.md`:
 > ```bash
 > make docker-build
 > kind load docker-image quay.io/kubeopencode/kubeopencode:latest --name <your-cluster-name>
 > kubectl rollout restart deployment/kubeopencode-server -n kubeopencode-system
 > ```
 
-### Docker and Registry
-
-Use these commands for **remote/production clusters** (OpenShift, EKS, GKE, etc.):
+### Docker, Registry, and Deployment
 
 ```bash
-# Build docker image (local only)
-make docker-build
-
-# Push docker image
-make docker-push
-
-# Multi-arch build and push (recommended for remote clusters)
-make docker-buildx
+make docker-build   # Build image (local)
+make docker-push    # Push image
+make docker-buildx  # Multi-arch build+push (recommended for remote clusters)
 ```
 
-After pushing, update the deployment:
-```bash
-kubectl rollout restart deployment kubeopencode-controller -n kubeopencode-system
-```
-
-### Cluster Deployment
-
-> **CRITICAL**: Always deploy KubeOpenCode to the `kubeopencode-system` namespace. This is the standard namespace used throughout all documentation and examples.
-
-```bash
-# Create namespace
-kubectl create namespace kubeopencode-system
-
-# Install with Helm
-helm install kubeopencode ./charts/kubeopencode \
-  --namespace kubeopencode-system
-
-# Or install from OCI registry
-helm install kubeopencode oci://quay.io/kubeopencode/helm-charts/kubeopencode \
-  --namespace kubeopencode-system
-```
+> **CRITICAL**: Always deploy to `kubeopencode-system` namespace.
 
 ### Agent Images
 
-KubeOpenCode uses a **two-container pattern** for AI task execution:
-
-1. **OpenCode Image** (Init Container): Contains the OpenCode CLI, copies it to a shared volume
-2. **Executor Image** (Worker Container): User's development environment that uses the OpenCode tool
-
-Agent images are located in `agents/`:
-
-| Image | Purpose | Container Type |
-|-------|---------|----------------|
-| `opencode` | OpenCode CLI (AI coding agent) | Init Container |
-| `devbox` | Universal development environment | Worker (Executor) |
-
-For **local development** (Kind clusters):
-```bash
-# Build OpenCode image (init container)
-make agent-build AGENT=opencode
-
-# Build devbox image (executor)
-make agent-build AGENT=devbox
-```
-
-For **remote/production clusters** (recommended):
-```bash
-# Multi-arch build and push (OpenShift, EKS, GKE, etc.)
-make agent-buildx AGENT=opencode
-make agent-buildx AGENT=devbox
-```
-
-The agent images are tagged as `quay.io/kubeopencode/kubeopencode-agent-<AGENT>:latest` by default. You can customize the registry, org, and version:
+Two-container pattern: `opencode` (init container) + `devbox` (executor). Located in `agents/`.
 
 ```bash
-make agent-build AGENT=devbox IMG_REGISTRY=docker.io IMG_ORG=myorg VERSION=v1.0.0
+make agent-build AGENT=opencode    # Local (Kind)
+make agent-buildx AGENT=opencode   # Remote (multi-arch)
 ```
+
+> See `docs/agent-images.md` for image resolution, customization, and backward compatibility.
 
 ## Key Files and Directories
 
 ```
-kubeopencode/
-├── agents/               # Agent images
-│   ├── opencode/        # OpenCode CLI (init container)
-│   └── devbox/          # Universal development environment (executor)
-├── api/v1alpha1/          # CRD type definitions
-│   ├── types.go           # Main API types (Task, Agent, KubeOpenCodeConfig)
-│   ├── agenttemplate_types.go  # AgentTemplate CRD types
-│   ├── register.go        # Scheme registration
-│   └── zz_generated.deepcopy.go  # Generated deepcopy
-├── cmd/kubeopencode/          # Unified binary entry point
-│   ├── main.go            # Root command
-│   ├── controller.go      # Controller subcommand
-│   ├── git_init.go        # Git init container subcommand
-│   ├── context_init.go    # Context initialization subcommand
-│   └── url_fetch.go       # URL context fetching subcommand
-├── internal/controller/   # Controller reconcilers
-│   ├── task_controller.go # Task reconciliation logic
-│   ├── agent_controller.go # Agent reconciliation (Server mode + template labels)
-│   ├── agenttemplate_controller.go # AgentTemplate reconciliation
-│   ├── template_merge.go  # Template + Agent merge logic
-│   ├── pod_builder.go     # Pod creation from Task specs
-│   └── context_resolver.go # Context resolution logic
-├── deploy/               # Kubernetes manifests
-│   ├── crds/            # Generated CRD YAMLs
-│   └── local-dev/       # Local development environment
-├── charts/kubeopencode/     # Helm chart
-│   └── templates/
-│       └── controller/   # Controller deployment
-├── hack/                # Build and codegen scripts
-├── docs/                # Documentation
-│   ├── getting-started.md  # Installation, examples, tutorials
-│   ├── features.md         # Context system, concurrency, pod configuration
-│   ├── agent-images.md     # Building and customizing agent images
-│   ├── security.md         # RBAC, credentials, pod security
-│   ├── architecture.md     # System design and API reference
-│   ├── troubleshooting.md  # Common issues and solutions
-│   └── adr/                # Architecture Decision Records
-└── Makefile             # Build automation
+api/v1alpha1/             # CRD type definitions (types.go, agenttemplate_types.go)
+cmd/kubeopencode/         # Unified binary (controller, git-init, context-init, url-fetch)
+internal/controller/      # Reconcilers (task, agent, agenttemplate, pod_builder, context_resolver, template_merge)
+deploy/crds/              # Generated CRD YAMLs
+deploy/local-dev/         # Local development environment
+charts/kubeopencode/      # Helm chart
+agents/                   # Agent images (opencode/, devbox/)
+e2e/                      # E2E tests
+docs/                     # Documentation
 ```
 
 ## Making Changes
 
 ### API Changes (Add/Update/Delete Fields)
 
-When making **any** changes to the API (adding, updating, or deleting fields):
+1. Update `api/v1alpha1/types.go` with kubebuilder markers
+2. Run `make update` then `make verify`
+3. **Update documentation** in `docs/architecture.md`
+4. **Update integration tests** in `internal/controller/*_test.go`
+5. **Update E2E tests** in `e2e/`
 
-1. Update `api/v1alpha1/types.go`
-2. Add/update appropriate kubebuilder markers
-3. Run `make update` to regenerate CRDs and deepcopy
-4. Run `make verify` to ensure everything is correct
-5. **Update documentation** in `docs/architecture.md`
-6. **Update integration tests** in `internal/controller/*_test.go` to cover the API changes
-7. **Update E2E tests** in `e2e/` to verify the changes work end-to-end
-
-> **IMPORTANT**: API changes are incomplete without corresponding updates to documentation, integration tests, and E2E tests. All three must be updated together with any API modification.
+> **IMPORTANT**: API changes are incomplete without documentation, integration tests, AND E2E tests.
 
 ### Modifying Controllers
 
-1. Update controller logic in `internal/controller/`
-2. Ensure proper error handling and logging
-3. Update status conditions appropriately
-4. Test locally with `make run` or `make e2e-setup`
+1. Update logic in `internal/controller/`
+2. Ensure proper error handling, logging, and status conditions
+3. Test with `make run` or `make e2e-setup`
 
 ### Adding or Modifying Agents
 
-When making **any** changes related to agents (adding new agents, modifying existing agent images, renaming agents, etc.):
-
 1. Add/update agent files in `agents/<agent-name>/`
-2. **Update GitHub workflow** in `.github/workflows/push.yaml`:
-   - Add path filter for the new agent in the `changes` job
-   - Add corresponding output variable
-   - Add new build job for the agent image (following existing patterns)
+2. **Update GitHub workflow** `.github/workflows/push.yaml` (path filter + build job)
 3. Update `agents/README.md` if adding a new agent
-4. Test the agent image build locally with `make agent-build AGENT=<name>`
+4. Test with `make agent-build AGENT=<name>`
 
-> **IMPORTANT**: Agent changes are incomplete without updating the CI workflow. The workflow uses path-based filtering to conditionally build agent images, so new agents won't be built in CI unless added to the workflow.
+> **IMPORTANT**: Agent changes are incomplete without updating the CI workflow.
 
 ### Updating CRDs
 
 ```bash
-# After modifying api/v1alpha1/types.go
-make update-crds
-
-# This will:
-# 1. Generate CRDs in deploy/crds/
-# 2. Copy them to charts/kubeopencode/templates/crds/
+make update-crds    # Generates to deploy/crds/ and charts/kubeopencode/templates/crds/
 ```
 
 ## Testing Guidelines
 
-This project uses a three-tier testing strategy:
-
-### Test Types and Commands
-
-```bash
-# Unit tests (fast, no external dependencies)
-make test
-
-# Integration tests (uses envtest, requires kubebuilder binaries)
-make integration-test
-
-# E2E tests (uses Kind cluster, full system test)
-make e2e-test
-```
-
-### Unit Tests
-
-- Place tests alongside the code being tested
-- Use table-driven tests where appropriate
-- Mock Kubernetes client using controller-runtime fakes
-- No special build tags required
-
-### Integration Tests (envtest)
-
-Integration tests use [envtest](https://book.kubebuilder.io/reference/envtest.html) to run a local API server and etcd, allowing controller testing without a full cluster.
-
-**Build Tag Pattern**: We use `//go:build integration` to separate integration tests from unit tests. This is the **standard pattern in the Kubernetes ecosystem**, used by:
-- [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) generated projects
-- [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
-- Most Kubernetes operator projects
-
-**Why this pattern?**
-- Tests remain close to the code they test (easier maintenance)
-- Clear separation: `go test ./...` runs unit tests, `go test -tags=integration ./...` runs integration tests
-- CI can run different test types in parallel
-- Alternative (separate `test/integration/` directory) separates tests from code, making maintenance harder
-
-**File structure**:
-```
-internal/controller/
-├── task_controller.go           # Controller implementation
-├── task_controller_test.go      # Integration tests (//go:build integration)
-└── suite_test.go                # Test suite setup (//go:build integration)
-```
-
-### E2E Tests
-
-- Located in `e2e/` directory
-- Use Kind cluster for full system testing
-- Test complete workflows (Task → Pod)
-- Verify status updates and conditions
-- Check that cleanup works correctly
-
-## Common Tasks
-
-### Adding a New Context Type
-
-1. Add new `ContextType` constant in `api/v1alpha1/types.go`
-2. Add corresponding struct (e.g., `APIContext`, `DatabaseContext`)
-3. Update `ContextItem` struct with new optional field
-4. Update controller's `resolveContextContent` function to handle new type
-5. Update documentation
-
-### AgentTemplate (Reusable Agent Configuration)
-
-AgentTemplate defines a reusable base configuration for Agents. Teams can maintain a single
-AgentTemplate with shared settings and individual users can create Agents that reference it.
-
-**Key concepts:**
-- Namespace-scoped (same namespace as Agents that reference it)
-- Agent references template via `spec.templateRef.name`
-- Label `kubeopencode.io/agent-template: <name>` is automatically set on referencing Agents
-- Controller watches template changes and re-reconciles dependent Agents
-
-**AgentTemplate spec fields** (same as Agent minus instance-specific fields):
-- `agentImage`, `executorImage`, `attachImage`, `workspaceDir` (required), `command`
-- `contexts`, `config`, `credentials`
-- `podSpec`, `serviceAccountName` (required)
-- `caBundle`, `proxy`, `imagePullSecrets`, `serverConfig`
-
-**Merge strategy** (when Agent references a template):
-- Scalar/pointer fields: Agent wins if non-zero/non-nil, else template value
-- List fields (contexts, credentials, imagePullSecrets): Agent **replaces** template if non-nil
-- `workspaceDir` and `serviceAccountName` are required on both AgentTemplate and Agent
-
-**Agent-only fields** (NOT in template):
-- `profile` (each Agent describes itself)
-- `maxConcurrentTasks`, `quota` (per-instance limits)
-- `templateRef` (the reference itself)
-
-**Example:**
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: AgentTemplate
-metadata:
-  name: team-base-config
-spec:
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  serviceAccountName: kubeopencode-agent
-  contexts:
-    - name: coding-standards
-      type: Text
-      text: "Always use signed commits..."
-  credentials:
-    - name: github-token
-      secretRef:
-        name: github-creds
-        key: token
-      env: GITHUB_TOKEN
----
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: alice-agent
-spec:
-  templateRef:
-    name: team-base-config
-  profile: "Alice's personal development agent"
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  serviceAccountName: kubeopencode-agent
-  maxConcurrentTasks: 3
-```
-
-### Agent Configuration
-
-Key Agent spec fields:
-- `templateRef`: Optional reference to an AgentTemplate in the same namespace
-- `profile`: Optional brief human-readable summary of the Agent's purpose and capabilities (for documentation/discovery, visible via `kubectl get agents -o wide`)
-- `agentImage`: OpenCode init container image (copies binary to `/tools`)
-- `executorImage`: Main worker container image for task execution
-- `command`: Optional entrypoint command (defaults to `/tools/opencode run "$(cat ${WORKSPACE_DIR}/task.md)"`)
-- `workspaceDir`: **Required** - Working directory where task.md, context files, and Git repos are mounted
-- `contexts`: Inline ContextItems applied to all tasks using this Agent
-- `config`: OpenCode configuration as inline JSON string (written to `/tools/opencode.json`)
-- `credentials`: Secrets as env vars or file mounts (supports single key or entire secret)
-- `caBundle`: Custom CA certificates for private HTTPS/Git servers (from ConfigMap or Secret)
-- `proxy`: HTTP/HTTPS proxy configuration (httpProxy, httpsProxy, noProxy); Agent-level overrides cluster-level
-- `imagePullSecrets`: Private registry image pull secrets (kubernetes.io/dockerconfigjson type, same namespace)
-- `podSpec.securityContext`: Container-level security context override (default: allowPrivilegeEscalation=false, drop ALL caps, RuntimeDefault seccomp)
-- `podSpec.podSecurityContext`: Pod-level security attributes (runAsUser, runAsGroup, fsGroup)
-- `serviceAccountName`: Kubernetes ServiceAccount for RBAC
-- `maxConcurrentTasks`: Limit concurrent Tasks using this Agent (nil/0 = unlimited)
-- `serverConfig`: Enable Server mode (persistent OpenCode server instead of per-Task Pods)
-
-**Two-Container Pattern:**
-
-KubeOpenCode uses a two-container pattern:
-1. **Init Container** (`agentImage`): Copies OpenCode binary to `/tools` shared volume
-2. **Worker Container** (`executorImage`): Runs tasks using `/tools/opencode`
-
-**Command Field (Optional):**
-
-The `command` field is optional and defaults to:
-```
-["sh", "-c", "/tools/opencode run \"$(cat ${WORKSPACE_DIR}/task.md)\""]
-```
-
-Most users don't need to customize this. Override only if you need custom execution behavior
-(e.g., different output format, additional flags, or non-opencode commands for testing).
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: opencode-agent
-spec:
-  profile: "General-purpose OpenCode development agent"
-  # OpenCode init container (optional, has default)
-  agentImage: quay.io/kubeopencode/kubeopencode-agent-opencode:latest
-  # Executor container (optional, has default)
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  # command is optional - uses default if not specified
-  # command:
-  #   - sh
-  #   - -c
-  #   - /tools/opencode run --format json "$(cat ${WORKSPACE_DIR}/task.md)"
-  serviceAccountName: kubeopencode-agent
-```
-
-**Proxy and Private Registry:**
-
-Agents in enterprise environments can configure proxy settings and private registry authentication:
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: enterprise-agent
-spec:
-  profile: "Enterprise agent with proxy and private registry"
-  agentImage: registry.corp.example.com/kubeopencode/agent-opencode:latest
-  executorImage: registry.corp.example.com/kubeopencode/agent-devbox:latest
-  workspaceDir: /workspace
-  serviceAccountName: kubeopencode-agent
-  proxy:
-    httpProxy: "http://proxy.corp.example.com:8080"
-    httpsProxy: "http://proxy.corp.example.com:8080"
-    noProxy: "localhost,127.0.0.1,10.0.0.0/8,.corp.example.com"
-  imagePullSecrets:
-    - name: harbor-registry-secret
-```
-
-**OpenCode Configuration:**
-
-The `config` field allows you to provide OpenCode configuration as an inline JSON string.
-This configuration is written to `/tools/opencode.json` and the `OPENCODE_CONFIG` environment
-variable is set to point to this file.
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: opencode-agent
-spec:
-  profile: "OpenCode agent with custom model configuration"
-  agentImage: quay.io/kubeopencode/kubeopencode-agent-opencode:latest
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  # command is optional - uses default if not specified
-  serviceAccountName: kubeopencode-agent
-  config: |
-    {
-      "$schema": "https://opencode.ai/config.json",
-      "model": "google/gemini-2.5-pro",
-      "small_model": "google/gemini-2.5-flash"
-    }
-```
-
-The config must be valid JSON. Invalid JSON will cause the Task to fail with an error.
-See https://opencode.ai/config.json for the full configuration schema.
-
-**Concurrency Control:**
-
-When an Agent uses backend AI services with rate limits (e.g., API quotas),
-you can limit concurrent Task execution using `maxConcurrentTasks`:
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: opencode-agent
-spec:
-  profile: "Concurrency-limited OpenCode agent"
-  agentImage: quay.io/kubeopencode/kubeopencode-agent-opencode:latest
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  # command is optional - uses default if not specified
-  serviceAccountName: kubeopencode-agent
-  maxConcurrentTasks: 3  # Only 3 Tasks can run concurrently
-```
-
-When the limit is reached:
-- New Tasks enter `Queued` phase instead of `Running`
-- Tasks are labeled with `kubeopencode.io/agent: <agent-name>` for tracking
-- Queued Tasks automatically transition to `Running` when capacity becomes available
-- Tasks are processed in approximate FIFO order
-
-**Quota (Rate Limiting):**
-
-In addition to `maxConcurrentTasks` (which limits simultaneous running Tasks),
-you can configure `quota` to limit the rate at which Tasks can start using a
-sliding time window:
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: rate-limited-agent
-spec:
-  profile: "Rate-limited agent with sliding window quota"
-  agentImage: quay.io/kubeopencode/kubeopencode-agent-opencode:latest
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  # command is optional - uses default: /tools/opencode run "$(cat ${WORKSPACE_DIR}/task.md)"
-  serviceAccountName: kubeopencode-agent
-  quota:
-    maxTaskStarts: 10     # Maximum 10 task starts
-    windowSeconds: 3600   # Per hour (sliding window)
-```
-
-**Quota vs MaxConcurrentTasks:**
-- `maxConcurrentTasks`: Limits how many Tasks run simultaneously (e.g., max 3 at once)
-- `quota`: Limits how quickly new Tasks can start (e.g., max 10 per hour)
-
-Both can be used together for comprehensive control. When quota is exceeded:
-- New Tasks enter `Queued` phase with reason `QuotaExceeded`
-- Task start history is tracked in `Agent.status.taskStartHistory`
-- Tasks automatically transition to `Running` when the sliding window allows
-
-**Server Mode (Persistent OpenCode Server):**
-
-Agents can run in two modes:
-- **Pod mode** (default): Creates a new Pod for each Task (ephemeral)
-- **Server mode**: Runs a persistent OpenCode server (Deployment + Service)
-
-Server mode is enabled by adding `serverConfig` to the Agent spec. This is useful for:
-- Avoiding cold start latency (container already running)
-- Sharing pre-loaded contexts/repos across Tasks
-- Long-running use cases (Slack bots, interactive sessions)
-
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: slack-agent
-  namespace: platform-agents
-spec:
-  profile: "Persistent Slack bot agent for interactive sessions"
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  serviceAccountName: kubeopencode-agent
-
-  # Presence of serverConfig enables Server mode
-  serverConfig:
-    port: 4096                    # OpenCode server port (default: 4096)
-
-  # Resource requirements (applies to both Pod and Server modes)
-  podSpec:
-    resources:
-      requests:
-        memory: "512Mi"
-        cpu: "500m"
-
-  # Concurrency limits apply to Server mode too
-  maxConcurrentTasks: 10
-
-  # Pre-loaded contexts available to all Tasks
-  contexts:
-    - name: codebase
-      type: Git
-      git:
-        repository: https://github.com/company/monorepo.git
-        ref: main
-      mountPath: code
-```
-
-**How Server Mode Works:**
-1. Agent controller creates a Deployment running `opencode serve`
-2. Agent controller creates a Service for internal access
-3. When a Task is created, the Task controller:
-   - Creates a Pod with command: `opencode run --attach <server-url> "$(cat task.md)"`
-   - Standard Pod status tracking (same as Pod mode)
-   - Logs available via `kubectl logs` (same as Pod mode)
-4. Pod is cleaned up via OwnerReference when Task is deleted
-
-**Server Mode Status:**
-The Agent status includes server information when in Server mode:
-```yaml
-status:
-  serverStatus:
-    deploymentName: slack-agent-server
-    serviceName: slack-agent
-    url: http://slack-agent.platform-agents.svc.cluster.local:4096
-    ready: true
-  conditions:
-    - type: ServerReady
-      status: "True"
-    - type: ServerHealthy
-      status: "True"
-```
-
-**Key Differences from Pod Mode:**
-| Aspect | Pod Mode | Server Mode |
-|--------|----------|-------------|
-| Resource lifecycle | New Pod per Task | Persistent Deployment + Pod per Task |
-| Command | `opencode run "task"` | `opencode run --attach <url> "task"` |
-| Cold start | Yes (container startup) | No (server already running) |
-| Context sharing | None (isolated Pods) | Shared across Tasks via server |
-| Scaling | Automatic (more Tasks = more Pods) | Single replica (initial) |
-| Logs | `kubectl logs <pod>` | `kubectl logs <pod>` (same) |
-
-**Note:** Task API is identical for both modes. Both create Pods; Server mode uses `--attach` flag.
-
-**Persistence:**
-
-By default, Server mode uses ephemeral storage — session data and workspace files are lost when the
-server pod restarts. Persistence can be configured independently for sessions and workspace:
-
-```yaml
-serverConfig:
-  port: 4096
-  persistence:
-    sessions:
-      storageClassName: "gp3"   # optional, uses cluster default if omitted
-      size: "2Gi"               # default: 1Gi
-    workspace:
-      storageClassName: "gp3"   # optional, uses cluster default if omitted
-      size: "20Gi"              # default: 10Gi
-```
-
-**Session persistence** (`persistence.sessions`):
-- A PVC (`{agent-name}-server-sessions`) is created and mounted at `/data/sessions`
-- `OPENCODE_DB` env var is set to `/data/sessions/opencode.db`
-- Conversation history survives pod restarts
-
-**Workspace persistence** (`persistence.workspace`):
-- The workspace EmptyDir is replaced with a PVC (`{agent-name}-server-workspace`)
-- Git-cloned repos, AI-modified files, and in-progress work survive pod restarts
-- git-init skips cloning when the repository already exists on the PVC
-
-Both PVCs are garbage-collected via OwnerReference when the Agent is deleted.
-Sessions and workspace can be configured independently (one, both, or neither).
-
-**Suspend/Resume:**
-
-Server-mode Agents can be suspended to save compute resources. Suspending scales the
-Deployment to 0 replicas while retaining PVCs and Service. Resuming scales back to 1.
-
-```yaml
-serverConfig:
-  port: 4096
-  suspend: true    # scales deployment to 0 replicas
-```
-
-When suspended:
-- `status.serverStatus.suspended` is `true`, `ready` is `false`
-- Tasks targeting a suspended agent enter `Queued` phase with reason `AgentSuspended`
-- PVCs and Service are retained (no data loss, DNS stable)
-- Resume by setting `suspend: false` — queued tasks automatically start
-
-API endpoints: `POST /api/v1/namespaces/{ns}/agents/{name}/suspend` and `.../resume`
-
-**Task Stop:**
-
-Running Tasks can be stopped by setting the `kubeopencode.io/stop=true` annotation:
-
-```bash
-kubectl annotate task my-task kubeopencode.io/stop=true
-```
-
-When this annotation is detected:
-- The controller deletes the Pod (with graceful termination period)
-- Kubernetes sends SIGTERM to the container, triggering graceful shutdown
-- Pod is deleted after termination (logs are not preserved)
-- Task status is set to `Completed` with a `Stopped` condition
-- The `Stopped` condition has reason `UserStopped`
-
-This is useful for:
-- Stopping long-running Tasks without waiting for timeout
-
-**Note:** Logs are lost when a Task is stopped. For log persistence, use an external log aggregation system (Loki, ELK, CloudWatch, etc.).
-
-**Credentials Mounting:**
-
-Credentials can be mounted in two ways:
-
-1. **Entire Secret** (all keys become ENV vars):
-```yaml
-credentials:
-- name: api-keys
-  secretRef:
-    name: api-credentials
-    # No key specified - all keys in secret become ENV vars
-```
-
-2. **Single Key** (with optional rename or file mount):
-```yaml
-credentials:
-- name: github-token
-  secretRef:
-    name: github-creds
-    key: token        # Specific key
-  env: GITHUB_TOKEN   # Optional: rename the env var
-- name: ssh-key
-  secretRef:
-    name: ssh-keys
-    key: id_rsa
-  mountPath: /home/agent/.ssh/id_rsa  # Mount as file
-  fileMode: 0400
-```
-
-**Custom CA Certificates:**
-
-For private Git servers or internal HTTPS services using self-signed or private CAs,
-use `caBundle` instead of disabling TLS verification. The CA certificate is mounted at
-`/etc/ssl/certs/custom-ca/tls.crt` in all containers and `CUSTOM_CA_CERT_PATH` is set.
-
-```yaml
-caBundle:
-  configMapRef:                    # OR secretRef
-    name: custom-ca-bundle
-    key: ca-bundle.crt             # Default: "ca-bundle.crt" for configMapRef, "ca.crt" for secretRef
-```
-
-Compatible with cert-manager trust-manager. The `git-init` container sets `GIT_SSL_CAINFO`
-and the `url-fetch` container appends the CA to the system certificate pool.
-
-### Agent Image Discovery
-
-KubeOpenCode uses a **two-container pattern**:
-
-1. **Init Container** (OpenCode image): Copies `/opencode` binary to `/tools` shared volume
-2. **Worker Container** (`executorImage`): Uses `/tools/opencode` to run AI tasks
-
-Image resolution:
-
-| Field | Container | Default |
-|-------|-----------|---------|
-| `agentImage` | Init Container (OpenCode) | `quay.io/kubeopencode/kubeopencode-agent-opencode:latest` |
-| `executorImage` | Worker Container | `quay.io/kubeopencode/kubeopencode-agent-devbox:latest` |
-
-**Backward Compatibility:**
-- If only `agentImage` is set (legacy): it's used as executor image, default OpenCode image for init container
-- If both are set: `agentImage` for init container, `executorImage` for worker container
-
-Agent lookup:
-- Task must specify `agentRef` to reference an Agent in the same namespace (required)
-- If `agentRef` is not specified, the Task will fail with an error
-
-The controller generates Pods with:
-- Init containers for context initialization (git-init, context-init, url-fetch)
-- Agent container with the configured agent image
-- Labels: `kubeopencode.io/task`
-- Env vars: `TASK_NAME`, `TASK_NAMESPACE`, `WORKSPACE_DIR`
-- ServiceAccount from Agent spec
-- Owner references for garbage collection
-
-### Task Cleanup
-
-KubeOpenCode supports automatic cleanup of completed/failed Tasks via `KubeOpenCodeConfig`. When configured, Tasks are automatically deleted based on TTL (time-to-live) and/or retention count policies.
-
-**Note:** `KubeOpenCodeConfig` is a **cluster-scoped singleton** resource. Following OpenShift convention, it must be named `cluster`.
-
-**CleanupConfig fields:**
-- `ttlSecondsAfterFinished`: Delete Tasks after N seconds from completion
-- `maxRetainedTasks`: Keep at most N completed Tasks per namespace (deletes oldest first)
-
-**Example KubeOpenCodeConfig with cleanup:**
-```yaml
-apiVersion: kubeopencode.io/v1alpha1
-kind: KubeOpenCodeConfig
-metadata:
-  name: cluster  # Required singleton name
-spec:
-  cleanup:
-    # Delete completed Tasks after 1 hour
-    ttlSecondsAfterFinished: 3600
-    # Keep at most 100 completed Tasks per namespace
-    maxRetainedTasks: 100
-```
-
-**Cleanup behavior:**
-- Both policies can be used independently or combined
-- When combined, TTL is checked first, then retention count
-- Tasks are sorted by `CompletionTime` for retention-based cleanup (oldest deleted first)
-- Cleanup configuration is cluster-wide, but `maxRetainedTasks` limit applies per namespace
-- No cleanup is performed if `KubeOpenCodeConfig` is not present (default behavior)
-
-**Note:** Deleting a Task cascades to its Pod and ConfigMap via OwnerReference.
-
-## Kubernetes Integration
-
-### RBAC
-
-The controller requires permissions for:
-- Creating/updating/deleting Pods
-- Reading/writing CR status
-- Reading Agents
-- Reading ConfigMaps and Secrets
-- Creating Events
+Three-tier strategy: unit (`make test`), integration (`make integration-test`, uses envtest), E2E (`make e2e-test`, uses Kind).
+
+- Integration tests use `//go:build integration` tag (standard Kubernetes ecosystem pattern)
+- Integration test files live alongside source code in `internal/controller/`
+- E2E tests in `e2e/` directory
 
 ## Documentation
 
-### Documentation Structure
+| File | When to Update |
+|------|----------------|
+| `README.md` | User-facing changes, new features |
+| `docs/getting-started.md` | Installation, examples |
+| `docs/features.md` | Context, concurrency, quota, pod config, server mode |
+| `docs/agent-images.md` | Agent image changes |
+| `docs/security.md` | RBAC, credentials |
+| `docs/architecture.md` | System design, API reference |
+| `docs/troubleshooting.md` | Common issues |
+| `charts/kubeopencode/README.md` | Helm values |
+| `CLAUDE.md` | API changes (also update inline godoc) |
 
-| File | Description | When to Update |
-|------|-------------|----------------|
-| `README.md` | High-level overview, community, quick start | User-facing changes, new features |
-| `docs/getting-started.md` | Installation, web terminal, detailed examples (Agent, Task, batch operations) | Installation changes, new examples |
-| `docs/features.md` | Context system, Agent configuration, concurrency, quota, pod configuration | Feature changes, new configuration options |
-| `docs/agent-images.md` | Two-container pattern, available images, image resolution, building agent images | Agent image changes, new images |
-| `docs/security.md` | RBAC, credential management, controller/agent pod security, best practices | Security-related changes |
-| `docs/architecture.md` | System design, API reference, detailed technical documentation | Architecture changes, API changes |
-| `docs/troubleshooting.md` | Common issues and solutions | New error scenarios, debugging tips |
-| `docs/ui-testing.md` | UI automated testing setup, architecture, and maintenance guide | UI test changes, new test patterns |
-| `deploy/local-dev/local-development.md` | Local development environment setup | Development workflow changes |
-| `charts/kubeopencode/README.md` | Helm chart deployment and configuration | Helm values changes |
-| `agents/README.md` | Building custom agent images | Agent development changes |
-| `docs/releasing.md` | Release SOP — step-by-step guide for creating a new release | Release process changes |
-| `docs/upgrading.md` | Upgrade SOP — step-by-step guide for upgrading KubeOpenCode on a cluster | Upgrade process changes, CRD change tracking |
-| `docs/adr/` | Architecture Decision Records | Significant architectural decisions |
-
-### Updating Documentation
-
-> **IMPORTANT**: Always update ALL relevant documentation when making changes. Do not forget the README.
-
-1. **README**: Update `README.md` for user-facing changes (new features, API changes)
-2. **Getting Started**: Update `docs/getting-started.md` for installation or example changes
-3. **Features**: Update `docs/features.md` for context, concurrency, or configuration changes
-4. **Agent Images**: Update `docs/agent-images.md` for agent image changes
-5. **Security**: Update `docs/security.md` for RBAC or credential changes
-6. **Architecture**: Update `docs/architecture.md` for system design or API changes
-7. **API changes**: Update inline godoc comments AND this file (`CLAUDE.md`)
-8. **Helm chart**: Update `charts/kubeopencode/README.md`
-9. **Decisions**: Add ADR in `docs/adr/`
-
-### Architecture Decision Records (ADRs)
-
-When making significant architectural decisions:
-1. Create new ADR in `docs/adr/`
-2. Follow existing ADR format
-3. Document context, decision, and consequences
+> **IMPORTANT**: Always update ALL relevant documentation when making changes. ADRs go in `docs/adr/`.
 
 ## Git Workflow
 
-### Commit Messages
-
-Follow conventional commit format:
-
-```
-<type>: <description>
-
-[optional body]
-
-Signed-off-by: Your Name <your.email@example.com>
-```
-
-Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
-
-### Signing Commits
-
-Always use signed commits:
-
-```bash
-git commit -s -m "feat: add new context type for API endpoints"
-```
-
-### Pull Requests
-
-1. Check for upstream repositories first
-2. Create PRs against upstream, not forks
-3. Use descriptive titles and comprehensive descriptions
-4. Reference related issues
+- **Conventional commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+- **Always sign commits**: `git commit -s -m "feat: description"`
+- **PRs**: Check for upstream repos first; create PRs against upstream, not forks
 
 ## Troubleshooting
 
-### Common Issues
+1. **CRDs not updating**: `make update-crds`
+2. **Deepcopy errors**: `make update`
+3. **Lint failures**: `make lint` locally first
+4. **E2E failures**: Check Kind cluster storage class
 
-1. **CRDs not updating**: Run `make update-crds`
-2. **Deepcopy errors**: Run `make update`
-3. **Lint failures**: Run `make lint` locally first
-4. **E2E tests failing**: Check if Kind cluster has proper storage class
-
-### Debugging Controllers
-
-```bash
-# Run controller with verbose logging
-go run ./cmd/kubeopencode controller --zap-log-level=debug
-
-# Check controller logs in cluster
-kubectl logs -n kubeopencode-system deployment/kubeopencode-controller -f
-
-# Check Pod logs
-kubectl logs <pod-name> -n kubeopencode-system
-```
+> See `docs/troubleshooting.md` for debugging commands and detailed solutions.
 
 ## Best Practices
 
-1. **Error Handling**: Always handle errors gracefully, log appropriately
-2. **Status Updates**: Use conditions for complex status, update progress regularly
-3. **Reconciliation**: Keep reconcile loops idempotent
-4. **Resource Cleanup**: Use owner references for garbage collection
-5. **Performance**: Avoid unnecessary API calls, use caching where appropriate
-6. **Security**: Never log sensitive data (tokens, credentials)
-7. **Testing**: Write tests for new features, maintain coverage
-8. **Stopping Tasks**: When asked to stop running Tasks, use the annotation method (`kubectl annotate task <name> kubeopencode.io/stop=true`) instead of `kubectl delete task`. Note that the annotation method deletes the Pod, so logs will be lost. For log persistence, use an external log aggregation system. Only use `kubectl delete` when explicitly asked to remove the Task entirely.
-
-## References
-
-- [Kubernetes Operator Pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
-- [Kubebuilder Book](https://book.kubebuilder.io/)
-- [Controller Runtime](https://github.com/kubernetes-sigs/controller-runtime)
-- [Architecture Documentation](docs/architecture.md)
+1. Keep reconcile loops idempotent
+2. Use owner references for garbage collection
+3. Never log sensitive data (tokens, credentials)
+4. Use `kubectl annotate task <name> kubeopencode.io/stop=true` to stop Tasks (not `kubectl delete`)
 
 ## Project Status
 
 - **Version**: v0.0.13
 - **API Stability**: v1alpha1 (subject to change)
 - **License**: Apache License 2.0
-- **Maintainer**: kubeopencode/kubeopencode team
-
-## Getting Help
-
-1. Review documentation in `docs/`
-2. Check existing issues and PRs
-3. Review Architecture Decision Records in `docs/adr/`
-4. Examine existing code and tests for patterns
 
 ---
 
-**Last Updated**: 2026-02-03
+**Last Updated**: 2026-03-31
