@@ -82,12 +82,12 @@ function AgentsPage() {
           placeholder="Filter agents by name..."
         />
         {uniqueTemplateNames.length > 0 && (
-          <div className="flex items-center space-x-1.5">
-            <span className="text-xs text-stone-400">Template:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-stone-400">Template:</span>
             <select
               value={templateFilter}
               onChange={(e) => setTemplateFilter(e.target.value)}
-              className="block w-44 rounded-lg border-stone-200 bg-white shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs text-stone-700 py-1.5"
+              className="block w-48 rounded-lg border border-stone-200 bg-white shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm text-stone-700 py-2"
             >
               <option value="">All</option>
               <option value={FILTER_HAS_TEMPLATE}>Has Template</option>

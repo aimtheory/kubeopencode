@@ -96,13 +96,13 @@ function TasksPage() {
           onFilterChange={setFilters}
           placeholder="Filter tasks by name..."
         />
-        <div className="flex items-center space-x-3 flex-wrap gap-y-2">
-          <div className="flex items-center space-x-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
             {PHASE_OPTIONS.map((phase) => (
               <button
                 key={phase || 'all'}
                 onClick={() => setPhaseFilter(phase)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
                   phaseFilter === phase
                     ? 'bg-stone-900 text-white border-stone-900'
                     : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700'
@@ -113,12 +113,12 @@ function TasksPage() {
             ))}
           </div>
           {uniqueAgentNames.length > 0 && (
-            <div className="flex items-center space-x-1.5">
-              <span className="text-xs text-stone-400">Agent:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-stone-400">Agent:</span>
               <select
                 value={agentFilter}
                 onChange={(e) => setAgentFilter(e.target.value)}
-                className="block w-40 rounded-lg border-stone-200 bg-white shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs text-stone-700 py-1.5"
+                className="block w-44 rounded-lg border border-stone-200 bg-white shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm text-stone-700 py-2"
               >
                 <option value="">All Agents</option>
                 {uniqueAgentNames.map((name) => (
