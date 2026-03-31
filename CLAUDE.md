@@ -56,7 +56,7 @@ Key Agent spec fields: `templateRef`, `profile`, `agentImage`, `executorImage`, 
 
 ### AgentTemplate
 
-Reusable base configuration referenced by Agents via `spec.templateRef.name`. Merge strategy: Agent wins for scalars; Agent **replaces** template for lists. Agent-only fields: `profile`, `maxConcurrentTasks`, `quota`, `templateRef`.
+Reusable base configuration referenced by Agents via `spec.templateRef.name`. Merge strategy: Agent wins for scalars; Agent **replaces** template for lists. Agent-only fields: `profile`, `serverConfig`, `templateRef`.
 
 > See `docs/architecture.md` for AgentTemplate spec fields and merge details.
 

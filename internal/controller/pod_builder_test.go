@@ -2602,9 +2602,9 @@ func TestBuildProxyEnvVars(t *testing.T) {
 
 func TestBuildPodWithProxy(t *testing.T) {
 	tests := []struct {
-		name       string
-		proxy      *kubeopenv1alpha1.ProxyConfig
-		wantProxy  bool
+		name      string
+		proxy     *kubeopenv1alpha1.ProxyConfig
+		wantProxy bool
 	}{
 		{
 			name: "proxy set - all containers have proxy env vars",

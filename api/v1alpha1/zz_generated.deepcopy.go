@@ -367,10 +367,15 @@ func (in *AgentTemplateSpec) DeepCopyInto(out *AgentTemplateSpec) {
 		*out = make([]v1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
-	if in.ServerConfig != nil {
-		in, out := &in.ServerConfig, &out.ServerConfig
-		*out = new(ServerConfig)
-		(*in).DeepCopyInto(*out)
+	if in.MaxConcurrentTasks != nil {
+		in, out := &in.MaxConcurrentTasks, &out.MaxConcurrentTasks
+		*out = new(int32)
+		**out = **in
+	}
+	if in.Quota != nil {
+		in, out := &in.Quota, &out.Quota
+		*out = new(QuotaConfig)
+		**out = **in
 	}
 }
 

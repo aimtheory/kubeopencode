@@ -117,7 +117,6 @@ export interface AgentTemplate {
   serviceAccountName?: string;
   contextsCount: number;
   credentialsCount: number;
-  hasServerConfig: boolean;
   credentials?: CredentialInfo[];
   contexts?: ContextItem[];
   createdAt: string;

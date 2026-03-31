@@ -124,7 +124,6 @@ type AgentTemplateResponse struct {
 	ServiceAccountName string            `json:"serviceAccountName,omitempty"`
 	ContextsCount      int               `json:"contextsCount"`
 	CredentialsCount   int               `json:"credentialsCount"`
-	HasServerConfig    bool              `json:"hasServerConfig"`
 	Credentials        []CredentialInfo  `json:"credentials,omitempty"`
 	Contexts           []ContextItem     `json:"contexts,omitempty"`
 	CreatedAt          time.Time         `json:"createdAt"`

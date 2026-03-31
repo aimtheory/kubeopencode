@@ -188,7 +188,35 @@ func TestMergeAgentWithTemplate(t *testing.T) {
 			},
 		},
 		{
-			name: "agent-only fields (maxConcurrentTasks, quota) come from agent",
+			name: "maxConcurrentTasks and quota inherited from template",
+			agent: &kubeopenv1alpha1.Agent{
+				Spec: kubeopenv1alpha1.AgentSpec{
+					WorkspaceDir:       "/workspace",
+					ServiceAccountName: "sa",
+				},
+			},
+			template: &kubeopenv1alpha1.AgentTemplate{
+				Spec: kubeopenv1alpha1.AgentTemplateSpec{
+					WorkspaceDir:       "/workspace",
+					ServiceAccountName: "sa",
+					MaxConcurrentTasks: int32Ptr(3),
+					Quota: &kubeopenv1alpha1.QuotaConfig{
+						MaxTaskStarts: 20,
+						WindowSeconds: 3600,
+					},
+				},
+			},
+			check: func(t *testing.T, cfg agentConfig) {
+				if cfg.maxConcurrentTasks == nil || *cfg.maxConcurrentTasks != 3 {
+					t.Errorf("expected maxConcurrentTasks=3 from template, got %v", cfg.maxConcurrentTasks)
+				}
+				if cfg.quota == nil || cfg.quota.MaxTaskStarts != 20 {
+					t.Errorf("expected quota.MaxTaskStarts=20 from template, got %v", cfg.quota)
+				}
+			},
+		},
+		{
+			name: "agent maxConcurrentTasks and quota override template",
 			agent: &kubeopenv1alpha1.Agent{
 				Spec: kubeopenv1alpha1.AgentSpec{
 					WorkspaceDir:       "/workspace",
@@ -204,45 +232,24 @@ func TestMergeAgentWithTemplate(t *testing.T) {
 				Spec: kubeopenv1alpha1.AgentTemplateSpec{
 					WorkspaceDir:       "/workspace",
 					ServiceAccountName: "sa",
-				},
-			},
-			check: func(t *testing.T, cfg agentConfig) {
-				if cfg.maxConcurrentTasks == nil || *cfg.maxConcurrentTasks != 5 {
-					t.Errorf("expected maxConcurrentTasks=5, got %v", cfg.maxConcurrentTasks)
-				}
-				if cfg.quota == nil || cfg.quota.MaxTaskStarts != 10 {
-					t.Errorf("expected quota.MaxTaskStarts=10, got %v", cfg.quota)
-				}
-			},
-		},
-		{
-			name: "serverConfig inherited from template",
-			agent: &kubeopenv1alpha1.Agent{
-				Spec: kubeopenv1alpha1.AgentSpec{
-					WorkspaceDir:       "/workspace",
-					ServiceAccountName: "sa",
-				},
-			},
-			template: &kubeopenv1alpha1.AgentTemplate{
-				Spec: kubeopenv1alpha1.AgentTemplateSpec{
-					WorkspaceDir:       "/workspace",
-					ServiceAccountName: "sa",
-					ServerConfig: &kubeopenv1alpha1.ServerConfig{
-						Port: 8080,
+					MaxConcurrentTasks: int32Ptr(3),
+					Quota: &kubeopenv1alpha1.QuotaConfig{
+						MaxTaskStarts: 20,
+						WindowSeconds: 7200,
 					},
 				},
 			},
 			check: func(t *testing.T, cfg agentConfig) {
-				if cfg.serverConfig == nil {
-					t.Fatal("expected serverConfig from template")
+				if cfg.maxConcurrentTasks == nil || *cfg.maxConcurrentTasks != 5 {
+					t.Errorf("expected maxConcurrentTasks=5 from agent override, got %v", cfg.maxConcurrentTasks)
 				}
-				if cfg.serverConfig.Port != 8080 {
-					t.Errorf("expected port 8080, got %d", cfg.serverConfig.Port)
+				if cfg.quota == nil || cfg.quota.MaxTaskStarts != 10 {
+					t.Errorf("expected quota.MaxTaskStarts=10 from agent override, got %v", cfg.quota)
 				}
 			},
 		},
 		{
-			name: "agent serverConfig overrides template",
+			name: "serverConfig is agent-only (not inherited from template)",
 			agent: &kubeopenv1alpha1.Agent{
 				Spec: kubeopenv1alpha1.AgentSpec{
 					WorkspaceDir:       "/workspace",
@@ -256,14 +263,11 @@ func TestMergeAgentWithTemplate(t *testing.T) {
 				Spec: kubeopenv1alpha1.AgentTemplateSpec{
 					WorkspaceDir:       "/workspace",
 					ServiceAccountName: "sa",
-					ServerConfig: &kubeopenv1alpha1.ServerConfig{
-						Port: 8080,
-					},
 				},
 			},
 			check: func(t *testing.T, cfg agentConfig) {
 				if cfg.serverConfig == nil || cfg.serverConfig.Port != 9090 {
-					t.Errorf("expected agent serverConfig override with port 9090, got %v", cfg.serverConfig)
+					t.Errorf("expected agent serverConfig with port 9090, got %v", cfg.serverConfig)
 				}
 			},
 		},

@@ -202,7 +202,6 @@ func templateToResponse(tmpl *kubeopenv1alpha1.AgentTemplate) types.AgentTemplat
 		ServiceAccountName: tmpl.Spec.ServiceAccountName,
 		ContextsCount:      len(tmpl.Spec.Contexts),
 		CredentialsCount:   len(tmpl.Spec.Credentials),
-		HasServerConfig:    tmpl.Spec.ServerConfig != nil,
 		CreatedAt:          tmpl.CreationTimestamp.Time,
 		Labels:             tmpl.Labels,
 		Conditions:         conditionsToResponse(tmpl.Status.Conditions),

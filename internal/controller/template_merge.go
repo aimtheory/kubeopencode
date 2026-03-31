@@ -54,9 +54,8 @@ func MergeAgentWithTemplate(agent *kubeopenv1alpha1.Agent, tmpl *kubeopenv1alpha
 		workspaceDir:       agent.Spec.WorkspaceDir,
 		serviceAccountName: agent.Spec.ServiceAccountName,
 
-		// Agent-only fields (not in template)
-		maxConcurrentTasks: agent.Spec.MaxConcurrentTasks,
-		quota:              agent.Spec.Quota,
+		maxConcurrentTasks: firstNonNilInt32(agent.Spec.MaxConcurrentTasks, tmpl.Spec.MaxConcurrentTasks),
+		quota:              firstNonNilQuota(agent.Spec.Quota, tmpl.Spec.Quota),
 
 		command:          firstNonNilSlice(agent.Spec.Command, tmpl.Spec.Command),
 		contexts:         firstNonNilContexts(agent.Spec.Contexts, tmpl.Spec.Contexts),
@@ -66,7 +65,7 @@ func MergeAgentWithTemplate(agent *kubeopenv1alpha1.Agent, tmpl *kubeopenv1alpha
 		caBundle:         firstNonNilCABundle(agent.Spec.CABundle, tmpl.Spec.CABundle),
 		proxy:            firstNonNilProxy(agent.Spec.Proxy, tmpl.Spec.Proxy),
 		imagePullSecrets: firstNonNilIPS(agent.Spec.ImagePullSecrets, tmpl.Spec.ImagePullSecrets),
-		serverConfig:     firstNonNilServerConfig(agent.Spec.ServerConfig, tmpl.Spec.ServerConfig),
+		serverConfig:     agent.Spec.ServerConfig,
 	}
 
 	return merged
@@ -130,7 +129,14 @@ func firstNonNilIPS(a, b []corev1.LocalObjectReference) []corev1.LocalObjectRefe
 	return b
 }
 
-func firstNonNilServerConfig(a, b *kubeopenv1alpha1.ServerConfig) *kubeopenv1alpha1.ServerConfig {
+func firstNonNilInt32(a, b *int32) *int32 {
+	if a != nil {
+		return a
+	}
+	return b
+}
+
+func firstNonNilQuota(a, b *kubeopenv1alpha1.QuotaConfig) *kubeopenv1alpha1.QuotaConfig {
 	if a != nil {
 		return a
 	}

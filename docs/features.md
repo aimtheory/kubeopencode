@@ -515,7 +515,7 @@ When this annotation is detected:
 ## Agent Templates
 
 AgentTemplate allows teams to define reusable base configurations for Agents. One person
-maintains the shared template (images, contexts, credentials, server config), and team members
+maintains the shared template (images, contexts, credentials), and team members
 create personal Agents that reference it.
 
 ### Creating a Template
@@ -565,7 +565,7 @@ spec:
 When an Agent references a template:
 - **Scalar fields** (images, workspaceDir, config, etc.): Agent wins if set, otherwise template value
 - **List fields** (contexts, credentials, imagePullSecrets): Agent's list **replaces** the template's (not appended)
-- **Agent-only fields** (profile, maxConcurrentTasks, quota): Always from Agent
+- **Agent-only fields** (profile, serverConfig): Always from Agent
 
 ### Tracking
 

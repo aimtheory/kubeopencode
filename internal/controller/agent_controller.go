@@ -76,14 +76,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	// Resolve agent configuration (merge with template if referenced).
-	// Must happen before IsServerMode check because template may provide serverConfig.
 	agentCfg, err := r.resolveAgentConfig(ctx, &agent)
 	if err != nil {
 		logger.Error(err, "Failed to resolve agent config")
 		return ctrl.Result{}, err
 	}
 
-	// Only handle Server-mode Agents (check merged config, not just agent spec)
+	// Only handle Server-mode Agents
 	if agentCfg.serverConfig == nil {
 		if err := r.cleanupServerResources(ctx, &agent); err != nil {
 			logger.Error(err, "Failed to cleanup server resources")

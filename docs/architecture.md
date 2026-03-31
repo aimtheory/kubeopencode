@@ -647,7 +647,8 @@ users create lightweight Agents that reference the template.
 | `caBundle` | *CABundleConfig | No | Custom CA certificates |
 | `proxy` | *ProxyConfig | No | HTTP/HTTPS proxy settings |
 | `imagePullSecrets` | []LocalObjectReference | No | Private registry secrets |
-| `serverConfig` | *ServerConfig | No | Server mode configuration |
+| `maxConcurrentTasks` | *int32 | No | Default concurrency limit |
+| `quota` | *QuotaConfig | No | Default rate limiting |
 
 ### Merge Strategy
 
@@ -655,7 +656,7 @@ When an Agent references a template via `spec.templateRef`, fields are merged:
 
 - **Scalar/pointer fields**: Agent value wins if non-zero/non-nil; otherwise template value is used
 - **List fields** (contexts, credentials, imagePullSecrets): Agent **replaces** the template list entirely if specified (not appended)
-- **Agent-only fields** (profile, maxConcurrentTasks, quota): Always from Agent (not in template)
+- **Agent-only fields** (profile, serverConfig): Always from Agent (not in template)
 
 ### Tracking
 
@@ -692,25 +693,40 @@ spec:
         name: shared-github-creds
         key: token
       env: GITHUB_TOKEN
+  maxConcurrentTasks: 3          # Default concurrency for all derived Agents
+  quota:
+    maxTaskStarts: 50
+    windowSeconds: 3600          # 50 tasks/hour default
+---
+apiVersion: kubeopencode.io/v1alpha1
+kind: Agent
+metadata:
+  name: alice-pod-agent
+  namespace: engineering
+spec:
+  templateRef:
+    name: team-python-dev
+  profile: "Alice's Pod-mode agent for batch tasks"
+  workspaceDir: /workspace
+  serviceAccountName: kubeopencode-agent
+  maxConcurrentTasks: 10         # Override: higher concurrency for batch work
+---
+apiVersion: kubeopencode.io/v1alpha1
+kind: Agent
+metadata:
+  name: alice-server-agent
+  namespace: engineering
+spec:
+  templateRef:
+    name: team-python-dev
+  profile: "Alice's Server-mode agent for interactive sessions"
+  workspaceDir: /workspace
+  serviceAccountName: kubeopencode-agent
   serverConfig:
     port: 4096
     persistence:
       sessions:
         size: "2Gi"
----
-apiVersion: kubeopencode.io/v1alpha1
-kind: Agent
-metadata:
-  name: alice-dev-agent
-  namespace: engineering
-spec:
-  templateRef:
-    name: team-python-dev
-  profile: "Alice's personal dev agent"
-  executorImage: quay.io/kubeopencode/kubeopencode-agent-devbox:latest
-  workspaceDir: /workspace
-  serviceAccountName: kubeopencode-agent
-  maxConcurrentTasks: 5
 ```
 
 ---

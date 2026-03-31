@@ -53,7 +53,6 @@ type AgentTemplateSpec struct {
 
 	// AttachImage specifies the lightweight image used for Server-mode --attach Pods.
 	// If not specified, defaults to "quay.io/kubeopencode/kubeopencode-agent-attach:latest".
-	// This field is ignored when ServerConfig is nil (Pod mode).
 	// +optional
 	AttachImage string `json:"attachImage,omitempty"`
 
@@ -103,9 +102,15 @@ type AgentTemplateSpec struct {
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// ServerConfig enables Server mode for Agents derived from this template.
+	// MaxConcurrentTasks provides a default concurrency limit for Agents derived from this template.
+	// Agents can override this value in their own spec.
 	// +optional
-	ServerConfig *ServerConfig `json:"serverConfig,omitempty"`
+	MaxConcurrentTasks *int32 `json:"maxConcurrentTasks,omitempty"`
+
+	// Quota provides default rate limiting for Agents derived from this template.
+	// Agents can override this value in their own spec.
+	// +optional
+	Quota *QuotaConfig `json:"quota,omitempty"`
 }
 
 // AgentTemplateStatus defines the observed state of AgentTemplate

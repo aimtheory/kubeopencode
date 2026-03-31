@@ -70,7 +70,6 @@ spec:
                 description: |-
                   AttachImage specifies the lightweight image used for Server-mode --attach Pods.
                   If not specified, defaults to "quay.io/kubeopencode/kubeopencode-agent-attach:latest".
-                  This field is ignored when ServerConfig is nil (Pod mode).
                 type: string
               caBundle:
                 description: CABundle configures custom CA certificates for TLS verification.
@@ -420,6 +419,12 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              maxConcurrentTasks:
+                description: |-
+                  MaxConcurrentTasks provides a default concurrency limit for Agents derived from this template.
+                  Agents can override this value in their own spec.
+                format: int32
+                type: integer
               podSpec:
                 description: PodSpec defines advanced Pod configuration for agent
                   pods.
@@ -2004,70 +2009,28 @@ spec:
                       Example: "localhost,127.0.0.1,10.0.0.0/8,.corp.example.com"
                     type: string
                 type: object
-              serverConfig:
-                description: ServerConfig enables Server mode for Agents derived from
-                  this template.
+              quota:
+                description: |-
+                  Quota provides default rate limiting for Agents derived from this template.
+                  Agents can override this value in their own spec.
                 properties:
-                  persistence:
-                    description: |-
-                      Persistence configures persistent storage for the server.
-                      When set, session data (and optionally workspace files) survive pod restarts.
-                    properties:
-                      sessions:
-                        description: |-
-                          Sessions enables persistent storage for OpenCode session data (SQLite DB).
-                          A PVC is created to store the session database, so conversation
-                          history survives server pod restarts.
-                        properties:
-                          size:
-                            description: |-
-                              Size of the PVC.
-                              If not specified, defaults to 1Gi for sessions and 10Gi for workspace.
-                            type: string
-                          storageClassName:
-                            description: StorageClassName for the PVC. If empty, uses
-                              cluster default StorageClass.
-                            type: string
-                        type: object
-                      workspace:
-                        description: |-
-                          Workspace enables persistent storage for the workspace directory.
-                          When enabled, git-cloned repos, AI-modified files, and in-progress work
-                          survive server pod restarts. Without this, workspace uses EmptyDir and
-                          is re-initialized on every restart (git repos re-cloned by init containers).
-                        properties:
-                          size:
-                            description: |-
-                              Size of the PVC.
-                              If not specified, defaults to 1Gi for sessions and 10Gi for workspace.
-                            type: string
-                          storageClassName:
-                            description: StorageClassName for the PVC. If empty, uses
-                              cluster default StorageClass.
-                            type: string
-                        type: object
-                    type: object
-                  port:
-                    default: 4096
-                    description: |-
-                      Port is the port OpenCode server listens on.
-                      Defaults to 4096 if not specified.
+                  maxTaskStarts:
+                    description: MaxTaskStarts is the maximum number of Task starts
+                      allowed within the window.
                     format: int32
-                    maximum: 65535
                     minimum: 1
                     type: integer
-                  suspend:
+                  windowSeconds:
                     description: |-
-                      Suspend scales the server deployment to 0 replicas when true.
-                      The server is stopped but PVCs and Service are retained, so the agent
-                      can be resumed without data loss. Tasks targeting a suspended agent
-                      enter Queued phase until the agent is resumed.
-
-                      This is useful for saving compute resources during off-hours while
-                      preserving session history and workspace state via persistent storage.
-
-                      Similar to Kubernetes CronJob's spec.suspend field.
-                    type: boolean
+                      WindowSeconds defines the sliding window duration in seconds.
+                      For example, 3600 (1 hour) means "max N tasks per hour".
+                    format: int32
+                    maximum: 86400
+                    minimum: 60
+                    type: integer
+                required:
+                - maxTaskStarts
+                - windowSeconds
                 type: object
               serviceAccountName:
                 description: ServiceAccountName specifies the Kubernetes ServiceAccount
