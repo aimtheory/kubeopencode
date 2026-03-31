@@ -26,13 +26,7 @@ function Layout() {
     refetchInterval: 5000,
   });
 
-  const { data: agentsData } = useQuery({
-    queryKey: ['sidebar-agents'],
-    queryFn: () => api.listAllAgents({ limit: 20 }),
-  });
-
   const tasks = tasksData?.tasks || [];
-  const agents = agentsData?.agents || [];
   const runningCount = tasks.filter(t => t.phase === 'Running').length;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -99,15 +93,6 @@ function Layout() {
             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span className="flex-1">Tasks</span>
-          {runningCount > 0 && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-600 text-[10px] font-semibold">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary-500" />
-              </span>
-              {runningCount}
-            </span>
-          )}
         </NavLink>
 
         <NavLink
@@ -132,11 +117,6 @@ function Layout() {
             <line x1="20" y1="10" x2="22" y2="10" />
           </svg>
           <span className="flex-1">Agents</span>
-          {agents.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-sidebar-muted font-semibold">
-              {agents.length}
-            </span>
-          )}
         </NavLink>
 
         <NavLink
