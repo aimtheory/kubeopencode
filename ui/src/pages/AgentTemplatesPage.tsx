@@ -119,20 +119,11 @@ function AgentTemplatesPage() {
                 className="bg-white rounded-xl border border-stone-200 overflow-hidden hover:border-stone-300 hover:shadow-md transition-all group"
               >
                 <div className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-stone-800 group-hover:text-stone-900">
-                        {tmpl.name}
-                      </h3>
-                      <p className="text-xs text-stone-400 mt-0.5 font-mono">{tmpl.namespace}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border ${
-                      tmpl.hasServerConfig
-                        ? 'bg-violet-50 text-violet-600 border-violet-200'
-                        : 'bg-stone-50 text-stone-400 border-stone-200'
-                    }`}>
-                      {tmpl.hasServerConfig ? 'Server' : 'Pod'}
-                    </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-stone-800 group-hover:text-stone-900">
+                      {tmpl.name}
+                    </h3>
+                    <p className="text-xs text-stone-400 mt-0.5 font-mono">{tmpl.namespace}</p>
                   </div>
 
                   <div className="mt-4 space-y-1.5">
