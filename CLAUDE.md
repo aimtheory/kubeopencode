@@ -684,6 +684,29 @@ status:
 
 **Note:** Task API is identical for both modes. Both create Pods; Server mode uses `--attach` flag.
 
+**Session Persistence:**
+
+By default, Server mode uses ephemeral storage — session data is lost when the server pod restarts.
+To persist OpenCode session history (conversation data stored in SQLite), configure `persistence.sessions`:
+
+```yaml
+serverConfig:
+  port: 4096
+  persistence:
+    sessions:
+      storageClassName: "gp3"   # optional, uses cluster default if omitted
+      size: "2Gi"               # default: 1Gi
+```
+
+When enabled:
+- A PVC (`{agent-name}-server-sessions`) is created and mounted at `/data/sessions`
+- `OPENCODE_DB` env var is set to `/data/sessions/opencode.db`
+- Session history survives pod restarts (crash, node drain, upgrade)
+- PVC is garbage-collected via OwnerReference when the Agent is deleted
+
+**Note:** Only session data (SQLite DB) is persisted. Workspace files use EmptyDir and are re-initialized
+on restart (git repos re-cloned by init containers). Workspace persistence is reserved for future implementation.
+
 **Task Stop:**
 
 Running Tasks can be stopped by setting the `kubeopencode.io/stop=true` annotation:

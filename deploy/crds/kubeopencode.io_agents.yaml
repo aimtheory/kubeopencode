@@ -2169,6 +2169,27 @@ spec:
                     serverConfig:
                       port: 4096
                 properties:
+                  persistence:
+                    description: |-
+                      Persistence configures persistent storage for the server.
+                      When set, session data (and optionally workspace files) survive pod restarts.
+                    properties:
+                      sessions:
+                        description: |-
+                          Sessions enables persistent storage for OpenCode session data (SQLite DB).
+                          A PVC is created to store the session database, so conversation
+                          history survives server pod restarts.
+                        properties:
+                          size:
+                            default: 1Gi
+                            description: Size of the PVC.
+                            type: string
+                          storageClassName:
+                            description: StorageClassName for the PVC. If empty, uses
+                              cluster default StorageClass.
+                            type: string
+                        type: object
+                    type: object
                   port:
                     default: 4096
                     description: |-

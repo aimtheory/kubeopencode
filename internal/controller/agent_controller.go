@@ -45,6 +45,7 @@ type AgentReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;delete
 
 // Reconcile handles Agent reconciliation.
 // For Server-mode Agents, it ensures the Deployment and Service exist and are up-to-date.
@@ -91,6 +92,12 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// Reconcile context ConfigMap if there are any contexts to store
 	if err := r.reconcileContextConfigMap(ctx, &agent, contextConfigMap); err != nil {
 		logger.Error(err, "Failed to reconcile context ConfigMap")
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile session PVC if persistence is configured
+	if err := r.reconcileSessionPVC(ctx, &agent); err != nil {
+		logger.Error(err, "Failed to reconcile session PVC")
 		return ctrl.Result{}, err
 	}
 
@@ -327,6 +334,45 @@ func (r *AgentReconciler) reconcileContextConfigMap(ctx context.Context, agent *
 	return nil
 }
 
+// reconcileSessionPVC ensures the session PVC exists when persistence is configured.
+// PVCs are immutable after creation, so we only create — never update.
+func (r *AgentReconciler) reconcileSessionPVC(ctx context.Context, agent *kubeopenv1alpha1.Agent) error {
+	logger := log.FromContext(ctx)
+
+	desired, err := BuildServerSessionPVC(agent)
+	if err != nil {
+		return fmt.Errorf("failed to build session PVC: %w", err)
+	}
+	if desired == nil {
+		// Session persistence not configured.
+		// Stale PVCs are cleaned up by cleanupServerResources (on mode switch)
+		// and by OwnerReference GC (on Agent deletion).
+		return nil
+	}
+
+	// Set owner reference for garbage collection
+	if err := controllerutil.SetControllerReference(agent, desired, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set owner reference on session PVC: %w", err)
+	}
+
+	// Check if PVC already exists
+	var existing corev1.PersistentVolumeClaim
+	err = r.Get(ctx, client.ObjectKey{Namespace: desired.Namespace, Name: desired.Name}, &existing)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Creating session PVC for Server-mode Agent", "pvc", desired.Name)
+			if err := r.Create(ctx, desired); err != nil {
+				return fmt.Errorf("failed to create session PVC: %w", err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to get session PVC: %w", err)
+	}
+
+	// PVC already exists — no update needed (PVC spec is immutable)
+	return nil
+}
+
 // cleanupServerResources removes Deployment and Service if they exist.
 // This is called when an Agent is changed from Server-mode to Pod-mode.
 func (r *AgentReconciler) cleanupServerResources(ctx context.Context, agent *kubeopenv1alpha1.Agent) error {
@@ -359,6 +405,16 @@ func (r *AgentReconciler) cleanupServerResources(ctx context.Context, agent *kub
 		logger.Info("Cleaning up stale context ConfigMap", "configmap", contextCMName)
 		if err := r.Delete(ctx, &contextCM); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete context ConfigMap: %w", err)
+		}
+	}
+
+	// Delete session PVC if exists
+	sessionPVCName := ServerSessionPVCName(agent.Name)
+	var sessionPVC corev1.PersistentVolumeClaim
+	if err := r.Get(ctx, client.ObjectKey{Namespace: agent.Namespace, Name: sessionPVCName}, &sessionPVC); err == nil {
+		logger.Info("Cleaning up stale session PVC", "pvc", sessionPVCName)
+		if err := r.Delete(ctx, &sessionPVC); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete session PVC: %w", err)
 		}
 	}
 
@@ -396,5 +452,6 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

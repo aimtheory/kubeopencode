@@ -80,6 +80,33 @@ type ServerConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port,omitempty"`
+
+	// Persistence configures persistent storage for the server.
+	// When set, session data (and optionally workspace files) survive pod restarts.
+	// +optional
+	Persistence *PersistenceConfig `json:"persistence,omitempty"`
+}
+
+// PersistenceConfig controls persistent storage for Server-mode Agents.
+// Session and workspace persistence are configured independently.
+type PersistenceConfig struct {
+	// Sessions enables persistent storage for OpenCode session data (SQLite DB).
+	// A PVC is created to store the session database, so conversation
+	// history survives server pod restarts.
+	// +optional
+	Sessions *VolumePersistence `json:"sessions,omitempty"`
+}
+
+// VolumePersistence defines PVC configuration for a persistent volume.
+type VolumePersistence struct {
+	// StorageClassName for the PVC. If empty, uses cluster default StorageClass.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// Size of the PVC.
+	// +optional
+	// +kubebuilder:default="1Gi"
+	Size string `json:"size,omitempty"`
 }
 
 // ServerStatus represents the observed state of a Server-mode Agent.
