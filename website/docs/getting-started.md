@@ -12,6 +12,14 @@ KubeOpenCode is in **early alpha** (v0.0.x). It is **not recommended for product
 
 This guide gets you running KubeOpenCode on a local Kind cluster in minutes. The default setup uses the free `opencode/big-pickle` model — **no API key required**.
 
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Kind](https://kind.sigs.k8s.io/) (`brew install kind` on macOS)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/) 3.8+
+- [Go](https://go.dev/) 1.25+
+
 ## Quick Start (AI-Assisted)
 
 The fastest way to get started — let your AI agent set up everything for you:
@@ -28,14 +36,6 @@ Then tell your AI agent (Claude Code, Cursor, Windsurf, etc.):
 The agent will handle Kind cluster creation, image builds, Helm installation, and test resource deployment automatically.
 
 ## Manual Setup
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/)
-- [Kind](https://kind.sigs.k8s.io/) (`brew install kind` on macOS)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/) 3.8+
-- [Go](https://go.dev/) 1.25+
 
 ### Step 1: Clone and Create Cluster
 

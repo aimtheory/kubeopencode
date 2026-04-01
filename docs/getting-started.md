@@ -1,5 +1,10 @@
 # Getting Started with KubeOpenCode
 
+## Prerequisites
+
+- Kubernetes 1.25+ (or [Kind](https://kind.sigs.k8s.io/) for local development)
+- Helm 3.8+
+
 ## Quick Start (AI-Assisted)
 
 The fastest way to get started — let your AI agent set up everything for you:
@@ -16,11 +21,6 @@ Then tell your AI agent (Claude Code, Cursor, Windsurf, etc.):
 The agent will handle Kind cluster creation, image builds, Helm installation, and test resource deployment automatically.
 
 ## Manual Setup
-
-### Prerequisites
-
-- Kubernetes 1.25+ (or [Kind](https://kind.sigs.k8s.io/) for local development)
-- Helm 3.8+
 
 ### Install
 
