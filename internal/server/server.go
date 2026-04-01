@@ -193,6 +193,7 @@ func (s *Server) setupRoutes() *chi.Mux {
 		r.Route("/namespaces/{namespace}/agenttemplates", func(r chi.Router) {
 			r.Get("/", agentTemplateHandler.List)
 			r.Get("/{name}", agentTemplateHandler.Get)
+			r.Delete("/{name}", agentTemplateHandler.Delete)
 		})
 
 		// Config endpoint (cluster-scoped singleton)
@@ -205,6 +206,7 @@ func (s *Server) setupRoutes() *chi.Mux {
 			r.Get("/", agentHandler.List)
 			r.Post("/", agentHandler.Create)
 			r.Get("/{name}", agentHandler.Get)
+			r.Delete("/{name}", agentHandler.Delete)
 			r.Post("/{name}/suspend", agentHandler.Suspend)
 			r.Post("/{name}/resume", agentHandler.Resume)
 

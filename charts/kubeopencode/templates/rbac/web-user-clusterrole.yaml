@@ -25,7 +25,7 @@ metadata:
     {{- include "kubeopencode.labels" . | nindent 4 }}
     app.kubernetes.io/component: web-user
 rules:
-# View tasks and agents
+# View tasks, agents, and templates
 - apiGroups: ["kubeopencode.io"]
   resources: ["tasks", "agents", "agenttemplates"]
   verbs: ["get", "list", "watch"]
@@ -33,6 +33,14 @@ rules:
 - apiGroups: ["kubeopencode.io"]
   resources: ["tasks"]
   verbs: ["create", "delete", "patch"]
+# Manage agents (create, delete, suspend/resume)
+- apiGroups: ["kubeopencode.io"]
+  resources: ["agents"]
+  verbs: ["create", "update", "delete"]
+# Delete agent templates
+- apiGroups: ["kubeopencode.io"]
+  resources: ["agenttemplates"]
+  verbs: ["delete"]
 # View pod status (required by task detail page)
 - apiGroups: [""]
   resources: ["pods"]

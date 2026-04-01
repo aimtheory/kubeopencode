@@ -1,11 +1,62 @@
-import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/client';
+import { useToast } from '../contexts/ToastContext';
 import Labels from '../components/Labels';
 import Breadcrumbs from '../components/Breadcrumbs';
 import YamlViewer from '../components/YamlViewer';
 import { DetailSkeleton } from '../components/Skeleton';
+
+function DeleteTemplateButton({ namespace, name }: { namespace: string; name: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await api.deleteAgentTemplate(namespace, name);
+      addToast(`Template "${name}" deleted`, 'success');
+      navigate('/templates');
+    } catch (err) {
+      addToast(`Failed to delete template: ${(err as Error).message}`, 'error');
+      setLoading(false);
+      setConfirming(false);
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-red-600">Delete?</span>
+        <button
+          onClick={handleDelete}
+          disabled={loading}
+          className="px-2.5 py-1 rounded-md text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+        >
+          {loading ? '...' : 'Confirm'}
+        </button>
+        <button
+          onClick={() => setConfirming(false)}
+          className="px-2.5 py-1 rounded-md text-xs font-medium text-stone-500 bg-stone-100 hover:bg-stone-200 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors"
+    >
+      Delete
+    </button>
+  );
+}
 
 function AgentTemplateDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
@@ -80,6 +131,7 @@ function AgentTemplateDetailPage() {
                 </svg>
                 Create Agent
               </Link>
+              <DeleteTemplateButton namespace={tmpl.namespace} name={tmpl.name} />
             </div>
           </div>
         </div>

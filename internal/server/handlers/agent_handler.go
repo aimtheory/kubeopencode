@@ -346,6 +346,31 @@ func (h *AgentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, agentToResponse(agent))
 }
 
+// Delete deletes an agent
+func (h *AgentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	namespace := chi.URLParam(r, "namespace")
+	name := chi.URLParam(r, "name")
+	ctx := r.Context()
+	k8sClient := h.getClient(ctx)
+
+	var agent kubeopenv1alpha1.Agent
+	if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &agent); err != nil {
+		if apierrors.IsNotFound(err) {
+			writeError(w, http.StatusNotFound, "Agent not found", err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to get agent", err.Error())
+		return
+	}
+
+	if err := k8sClient.Delete(ctx, &agent); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to delete agent", err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Suspend scales the server deployment to 0 replicas.
 func (h *AgentHandler) Suspend(w http.ResponseWriter, r *http.Request) {
 	h.setSuspendState(w, r, true)

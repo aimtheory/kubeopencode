@@ -224,6 +224,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(error.message || error.error || `HTTP ${response.status}`);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
@@ -334,6 +338,9 @@ export const api = {
   resumeAgent: (namespace: string, name: string) =>
     request<Agent>(`/namespaces/${namespace}/agents/${name}/resume`, { method: 'POST' }),
 
+  deleteAgent: (namespace: string, name: string) =>
+    request<void>(`/namespaces/${namespace}/agents/${name}`, { method: 'DELETE' }),
+
   // Agent Templates
   listAllAgentTemplates: (params?: FilterParams) => {
     const searchParams = new URLSearchParams();
@@ -359,6 +366,9 @@ export const api = {
 
   getAgentTemplate: (namespace: string, name: string) =>
     request<AgentTemplate>(`/namespaces/${namespace}/agenttemplates/${name}`),
+
+  deleteAgentTemplate: (namespace: string, name: string) =>
+    request<void>(`/namespaces/${namespace}/agenttemplates/${name}`, { method: 'DELETE' }),
 
   getAgentTemplateYaml: async (namespace: string, name: string): Promise<string> => {
     const response = await fetch(`${API_BASE}/namespaces/${namespace}/agenttemplates/${name}?output=yaml`);

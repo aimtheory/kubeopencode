@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/go-chi/chi/v5"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kubeopenv1alpha1 "github.com/kubeopencode/kubeopencode/api/v1alpha1"
@@ -189,6 +190,31 @@ func (h *AgentTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResourceOutput(w, r, http.StatusOK, &tmpl, resp)
+}
+
+// Delete deletes an agent template
+func (h *AgentTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	namespace := chi.URLParam(r, "namespace")
+	name := chi.URLParam(r, "name")
+	ctx := r.Context()
+	k8sClient := h.getClient(ctx)
+
+	var tmpl kubeopenv1alpha1.AgentTemplate
+	if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &tmpl); err != nil {
+		if apierrors.IsNotFound(err) {
+			writeError(w, http.StatusNotFound, "AgentTemplate not found", err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to get agent template", err.Error())
+		return
+	}
+
+	if err := k8sClient.Delete(ctx, &tmpl); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to delete agent template", err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // templateToResponse converts an AgentTemplate CRD to an API response
