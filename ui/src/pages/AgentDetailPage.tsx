@@ -177,6 +177,12 @@ function AgentDetailPage() {
     queryKey: ['agent', namespace, name],
     queryFn: () => api.getAgent(namespace!, name!),
     enabled: !!namespace && !!name,
+    refetchInterval: (query) => {
+      const a = query.state.data;
+      // Poll every 3s while agent is in a transitional state (starting/stopping)
+      if (a && !a.serverStatus?.suspended && !a.serverStatus?.ready) return 3000;
+      return false;
+    },
   });
 
   if (isLoading) {

@@ -72,6 +72,12 @@ function AgentTemplateDetailPage() {
     queryKey: ['template-agents', namespace, name],
     queryFn: () => api.listAgents(namespace!, { labelSelector: `kubeopencode.io/agent-template=${name}` }),
     enabled: !!namespace && !!name,
+    refetchInterval: (query) => {
+      const agents = query.state.data?.agents;
+      // Poll every 5s while any referencing agent is in a transitional state
+      if (agents?.some((a) => !a.serverStatus?.suspended && !a.serverStatus?.ready)) return 5000;
+      return false;
+    },
   });
 
   const referencingAgents = agentsData?.agents || [];

@@ -77,6 +77,12 @@ function AgentsPage() {
         ? api.listAllAgents(params)
         : api.listAgents(namespace, params);
     },
+    refetchInterval: (query) => {
+      const agents = query.state.data?.agents;
+      // Poll every 5s while any agent is in a transitional state (starting/stopping)
+      if (agents?.some((a) => !a.serverStatus?.suspended && !a.serverStatus?.ready)) return 5000;
+      return false;
+    },
   });
 
   // Client-side status filtering + pagination

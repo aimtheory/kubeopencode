@@ -16,6 +16,12 @@ function DashboardPage() {
   const { data: agentsData, isLoading: agentsLoading } = useQuery({
     queryKey: ['dashboard-agents'],
     queryFn: () => api.listAllAgents({ limit: 100 }),
+    refetchInterval: (query) => {
+      const agents = query.state.data?.agents;
+      // Poll every 5s while any agent is in a transitional state
+      if (agents?.some((a) => !a.serverStatus?.suspended && !a.serverStatus?.ready)) return 5000;
+      return false;
+    },
   });
 
   const tasks = tasksData?.tasks || [];
