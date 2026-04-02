@@ -352,15 +352,17 @@ var _ = Describe("Task E2E Tests", Label(LabelTask), func() {
 				return createdTask.Status.Phase
 			}, timeout, interval).Should(Equal(kubeopenv1alpha1.TaskPhaseRunning))
 
-			By("Verifying StartTime is set")
-			runningTask := &kubeopenv1alpha1.Task{}
-			Expect(k8sClient.Get(ctx, taskKey, runningTask)).Should(Succeed())
-			Expect(runningTask.Status.StartTime).ShouldNot(BeNil())
-			Expect(runningTask.Status.PodName).ShouldNot(BeEmpty())
-
-			By("Verifying status.agentRef is populated")
-			Expect(runningTask.Status.AgentRef).ShouldNot(BeNil())
-			Expect(runningTask.Status.AgentRef.Name).Should(Equal(agentName))
+			By("Verifying StartTime, PodName, and AgentRef are set")
+			Eventually(func() bool {
+				runningTask := &kubeopenv1alpha1.Task{}
+				if err := k8sClient.Get(ctx, taskKey, runningTask); err != nil {
+					return false
+				}
+				return runningTask.Status.StartTime != nil &&
+					runningTask.Status.PodName != "" &&
+					runningTask.Status.AgentRef != nil &&
+					runningTask.Status.AgentRef.Name == agentName
+			}, timeout, interval).Should(BeTrue())
 
 			By("Verifying Task transitions to Completed")
 			Eventually(func() kubeopenv1alpha1.TaskPhase {
