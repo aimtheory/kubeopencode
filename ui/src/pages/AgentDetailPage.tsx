@@ -223,15 +223,15 @@ function AgentDetailPage() {
 
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
         <div className="px-6 py-5 border-b border-stone-100">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="font-display text-xl font-bold text-stone-900">{agent.name}</h2>
               <p className="text-xs text-stone-400 mt-0.5 font-mono">{agent.namespace}</p>
               {agent.profile && (
                 <p className="mt-2 text-sm text-stone-500 leading-relaxed">{agent.profile}</p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
                 agent.serverStatus?.suspended
                   ? 'bg-amber-50 text-amber-600 border-amber-200'
