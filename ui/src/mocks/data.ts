@@ -8,7 +8,32 @@ import type {
 } from '../api/client';
 
 export const mockNamespaces = {
-  namespaces: ['default', 'production', 'staging', 'test', 'platform'],
+  namespaces: [
+    'default',
+    'production',
+    'staging',
+    'test',
+    'platform',
+    'kube-system',
+    'kube-public',
+    'kube-node-lease',
+    'kubeopencode-system',
+    'kubeopencode-agent',
+    'monitoring',
+    'logging',
+    'cert-manager',
+    'ingress-nginx',
+    'argocd',
+    'argo-events',
+    'istio-system',
+    'metallb-system',
+    'openshift-operators',
+    'openshift-machine-api',
+    'openshift-monitoring',
+    'my-very-long-namespace-name-for-testing-purposes',
+    'team-alpha-dev-environment',
+    'team-beta-staging-environment',
+  ],
 };
 
 export const mockTasks: Task[] = [
