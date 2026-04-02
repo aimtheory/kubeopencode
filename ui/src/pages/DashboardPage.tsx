@@ -5,17 +5,24 @@ import api from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 import { DashboardSkeleton } from '../components/Skeleton';
 import TimeAgo from '../components/TimeAgo';
+import { useNamespace } from '../contexts/NamespaceContext';
 
 function DashboardPage() {
+  const { namespace, isAllNamespaces } = useNamespace();
+
   const { data: tasksData, isLoading: tasksLoading } = useQuery({
-    queryKey: ['dashboard-tasks'],
-    queryFn: () => api.listAllTasks({ limit: 10 }),
+    queryKey: ['dashboard-tasks', namespace],
+    queryFn: () => isAllNamespaces
+      ? api.listAllTasks({ limit: 10 })
+      : api.listTasks(namespace, { limit: 10 }),
     refetchInterval: 5000,
   });
 
   const { data: agentsData, isLoading: agentsLoading } = useQuery({
-    queryKey: ['dashboard-agents'],
-    queryFn: () => api.listAllAgents({ limit: 100 }),
+    queryKey: ['dashboard-agents', namespace],
+    queryFn: () => isAllNamespaces
+      ? api.listAllAgents({ limit: 100 })
+      : api.listAgents(namespace, { limit: 100 }),
     refetchInterval: (query) => {
       const agents = query.state.data?.agents;
       // Poll every 5s while any agent is in a transitional state
