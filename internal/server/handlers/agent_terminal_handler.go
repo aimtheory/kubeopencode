@@ -128,8 +128,17 @@ func (h *AgentTerminalHandler) ServeTerminal(w http.ResponseWriter, r *http.Requ
 	// Mutex to serialize all WebSocket writes (gorilla/websocket requires this)
 	var wsMu sync.Mutex
 
-	// Detach from chi's 60s timeout for long-lived connection
-	ctx := context.WithoutCancel(r.Context())
+	// Detach from chi's 60s timeout for long-lived connection.
+	// Use a separate cancellable context so we can stop the exec stream and heartbeat
+	// when the WebSocket disconnects.
+	sessionCtx, sessionCancel := context.WithCancel(context.WithoutCancel(r.Context()))
+	defer sessionCancel()
+
+	// Start connection heartbeat to prevent standby auto-suspend while terminal is active.
+	// Uses the server's service account (defaultClient), not the impersonated user client.
+	go controller.RunConnectionHeartbeat(sessionCtx, h.defaultClient, namespace, agentName, func(err error) {
+		termLog.Error(err, "heartbeat: failed to patch annotation", "agent", agentName)
+	})
 
 	// Build the exec request using impersonated config
 	execClientset, err := kubernetes.NewForConfig(execConfig)
@@ -181,6 +190,7 @@ func (h *AgentTerminalHandler) ServeTerminal(w http.ResponseWriter, r *http.Requ
 		defer wg.Done()
 		defer pw.Close()
 		defer close(sizeQueue.ch)
+		defer sessionCancel() // Cancel session context when WebSocket disconnects
 
 		for {
 			msgType, data, err := ws.ReadMessage()
@@ -218,7 +228,7 @@ func (h *AgentTerminalHandler) ServeTerminal(w http.ResponseWriter, r *http.Requ
 	wsWriter := &wsStdoutWriter{ws: ws, mu: &wsMu}
 
 	// Execute the command - this blocks until the exec session ends
-	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+	err = exec.StreamWithContext(sessionCtx, remotecommand.StreamOptions{
 		Stdin:             pr,
 		Stdout:            wsWriter,
 		Tty:               true,
