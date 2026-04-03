@@ -244,7 +244,7 @@ func isAlreadyExistsGeneric(err error) bool {
 
 // Helper function to generate unique names for test resources
 func uniqueName(prefix string) string {
-	return fmt.Sprintf("%s-%s-%04d", prefix, time.Now().Format("150405"), rand.IntN(10000))
+	return fmt.Sprintf("%s-%s-%04d", prefix, time.Now().Format("150405"), rand.IntN(10000)) //nolint:gosec // Test helper, no security requirement
 }
 
 // getTaskCondition retrieves a specific condition from Task status

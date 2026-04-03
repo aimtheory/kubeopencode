@@ -860,11 +860,6 @@ func validateMountPathConflicts(fileMounts []fileMount, dirMounts []dirMount, gi
 	return nil
 }
 
-// resolveContextItem resolves a ContextItem to its content, directory mount, or git mount.
-func (r *TaskReconciler) resolveContextItem(ctx context.Context, item *kubeopenv1alpha1.ContextItem, defaultNS, workspaceDir string) (*resolvedContext, *dirMount, *gitMount, error) {
-	return resolveContextItemFromReader(r.Client, ctx, item, defaultNS, workspaceDir)
-}
-
 // resolveMountPath converts relative paths to absolute paths based on workspaceDir.
 // Paths starting with "/" are treated as absolute and returned as-is.
 // Paths NOT starting with "/" are treated as relative and prefixed with workspaceDir.
@@ -877,21 +872,6 @@ func resolveMountPath(mountPath, workspaceDir string) string {
 		return mountPath
 	}
 	return workspaceDir + "/" + mountPath
-}
-
-// resolveContextContent resolves content from a ContextItem.
-func (r *TaskReconciler) resolveContextContent(ctx context.Context, namespace, name, workspaceDir string, item *kubeopenv1alpha1.ContextItem, mountPath string) (string, *dirMount, *gitMount, error) {
-	return resolveContextContentFromReader(r.Client, ctx, namespace, name, workspaceDir, item, mountPath)
-}
-
-// getConfigMapKey retrieves a specific key from a ConfigMap.
-func (r *TaskReconciler) getConfigMapKey(ctx context.Context, namespace, name, key string, optional *bool) (string, error) {
-	return getConfigMapKeyFromReader(r.Client, ctx, namespace, name, key, optional)
-}
-
-// getConfigMapAllKeys retrieves all keys from a ConfigMap and formats them for aggregation.
-func (r *TaskReconciler) getConfigMapAllKeys(ctx context.Context, namespace, name string, optional *bool) (string, error) {
-	return getConfigMapAllKeysFromReader(r.Client, ctx, namespace, name, optional)
 }
 
 // checkAgentCapacity checks if the agent has capacity for a new task.

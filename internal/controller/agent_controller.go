@@ -182,7 +182,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// Use the shortest of: default interval, standby idle timeout, git sync interval.
 	requeueAfter := DefaultServerReconcileInterval
 	if agent.Spec.Standby != nil && !agent.Spec.Suspend && agent.Status.IdleSince != nil {
-		remaining := time.Until(agent.Status.IdleSince.Time.Add(agent.Spec.Standby.IdleTimeout.Duration))
+		remaining := time.Until(agent.Status.IdleSince.Add(agent.Spec.Standby.IdleTimeout.Duration))
 		if remaining > 0 && remaining < requeueAfter {
 			requeueAfter = remaining
 		}
@@ -580,7 +580,8 @@ func (r *AgentReconciler) reconcileStandby(ctx context.Context, agent *kubeopenv
 
 	activeConnection := hasActiveConnection(agent, staleness)
 
-	if activeTasks > 0 {
+	switch {
+	case activeTasks > 0:
 		// Tasks are active — clear idle timer
 		if agent.Status.IdleSince != nil {
 			logger.Info("Tasks active, clearing idle timer", "agent", agent.Name, "activeTasks", activeTasks)
@@ -597,13 +598,13 @@ func (r *AgentReconciler) reconcileStandby(ctx context.Context, agent *kubeopenv
 			}
 			return true, nil
 		}
-	} else if activeConnection {
+	case activeConnection:
 		// No active tasks but active connection — defer idle timer
 		if agent.Status.IdleSince != nil {
 			logger.Info("Active connection detected, clearing idle timer", "agent", agent.Name)
 			agent.Status.IdleSince = nil
 		}
-	} else {
+	default:
 		// No active tasks and no active connection
 		if agent.Status.IdleSince == nil {
 			now := metav1.Now()

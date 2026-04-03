@@ -101,13 +101,13 @@ type ProxyConfig struct {
 	// Sets HTTP_PROXY and http_proxy environment variables.
 	// Example: "http://proxy.corp.example.com:8080"
 	// +optional
-	HttpProxy string `json:"httpProxy,omitempty"`
+	HttpProxy string `json:"httpProxy,omitempty"` //nolint:staticcheck,revive // JSON API field name convention
 
 	// HttpsProxy is the URL of the HTTPS proxy server.
 	// Sets HTTPS_PROXY and https_proxy environment variables.
 	// Example: "http://proxy.corp.example.com:8080"
 	// +optional
-	HttpsProxy string `json:"httpsProxy,omitempty"`
+	HttpsProxy string `json:"httpsProxy,omitempty"` //nolint:staticcheck,revive // JSON API field name convention
 
 	// NoProxy is a comma-separated list of hosts that should bypass the proxy.
 	// Sets NO_PROXY and no_proxy environment variables.

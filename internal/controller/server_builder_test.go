@@ -1467,7 +1467,7 @@ func TestBuildServerDeployment_WithGitSyncRollout(t *testing.T) {
 	}
 
 	// Should have pod template annotation with git hash
-	annotations := deployment.Spec.Template.ObjectMeta.Annotations
+	annotations := deployment.Spec.Template.Annotations
 	if annotations == nil {
 		t.Fatal("expected pod template annotations, got nil")
 	}

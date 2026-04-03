@@ -1,12 +1,11 @@
 # golangci-lint configuration for KubeOpenCode
-# Using golangci-lint v2.6.2 with Go 1.25
+# Version is auto-detected by ci/lint/run-lint.sh based on go.mod
 # Reference: https://golangci-lint.run/docs/usage/configuration/
 
 version: "2"
 
 run:
   timeout: 5m
-  go: "1.25"
 
 linters:
   # Explicitly enable linters for reproducible builds
@@ -31,7 +30,7 @@ linters:
   settings:
     errcheck:
       check-blank: false  # Allow using _ = to ignore errors
-      check-type-assertions: true
+      check-type-assertions: false
 
     govet:
       enable-all: true

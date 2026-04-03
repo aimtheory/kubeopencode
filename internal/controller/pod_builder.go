@@ -140,9 +140,9 @@ type gitMount struct {
 	recurseSubmodules bool   // Whether to recursively clone submodules
 
 	// Sync fields (only effective for Agent contexts)
-	syncEnabled  bool          // Whether auto-sync is enabled
+	syncEnabled  bool                           // Whether auto-sync is enabled
 	syncPolicy   kubeopenv1alpha1.GitSyncPolicy // HotReload or Rollout
-	syncInterval time.Duration // Polling interval
+	syncInterval time.Duration                  // Polling interval
 }
 
 // resolvedContext holds a resolved context with its content and metadata
@@ -714,10 +714,10 @@ func buildProxyEnvVars(proxy *kubeopenv1alpha1.ProxyConfig) []corev1.EnvVar {
 		noProxy = ".svc,.cluster.local"
 	} else {
 		if !strings.Contains(noProxy, ".svc") {
-			noProxy = noProxy + ",.svc"
+			noProxy += ",.svc"
 		}
 		if !strings.Contains(noProxy, ".cluster.local") {
-			noProxy = noProxy + ",.cluster.local"
+			noProxy += ",.cluster.local"
 		}
 	}
 

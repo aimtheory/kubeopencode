@@ -123,7 +123,7 @@ func (h *AgentTerminalHandler) ServeTerminal(w http.ResponseWriter, r *http.Requ
 		termLog.Error(err, "websocket upgrade failed")
 		return
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Mutex to serialize all WebSocket writes (gorilla/websocket requires this)
 	var wsMu sync.Mutex
@@ -188,7 +188,7 @@ func (h *AgentTerminalHandler) ServeTerminal(w http.ResponseWriter, r *http.Requ
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer pw.Close()
+		defer func() { _ = pw.Close() }()
 		defer close(sizeQueue.ch)
 		defer sessionCancel() // Cancel session context when WebSocket disconnects
 

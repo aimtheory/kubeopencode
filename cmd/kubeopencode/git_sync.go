@@ -208,4 +208,3 @@ func safeHash(hash string) string {
 	}
 	return hash
 }
-
