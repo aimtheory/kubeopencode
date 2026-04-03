@@ -63,7 +63,7 @@ func init() {
 
 func runTaskSubmit(cmd *cobra.Command, args []string) error {
 	// Read task prompt
-	taskContent, err := os.ReadFile(taskSubmitTaskFile)
+	taskContent, err := os.ReadFile(taskSubmitTaskFile) //nolint:gosec // User-provided CLI flag, not untrusted input
 	if err != nil {
 		return fmt.Errorf("failed to read task file %s: %w", taskSubmitTaskFile, err)
 	}
@@ -117,7 +117,7 @@ func createSession(client *http.Client, serverURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -160,7 +160,7 @@ func submitPrompt(client *http.Client, serverURL, sessionID, prompt string) erro
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// prompt_async returns 204 No Content on success
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
@@ -186,11 +186,11 @@ func waitForIdle(client *http.Client, serverURL, sessionID string) error {
 
 		var statuses sessionStatusMap
 		if err := json.NewDecoder(resp.Body).Decode(&statuses); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			fmt.Printf("[task-submit] warning: failed to decode status: %v\n", err)
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		status, ok := statuses[sessionID]
 		if !ok {
@@ -223,7 +223,7 @@ func streamEvents(serverURL, sessionID string, done chan struct{}) {
 		fmt.Printf("[task-submit] warning: failed to connect to SSE: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	scanner := bufio.NewScanner(resp.Body)
 	// Increase buffer for large events

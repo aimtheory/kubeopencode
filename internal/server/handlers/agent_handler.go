@@ -189,17 +189,17 @@ func (h *AgentHandler) Get(w http.ResponseWriter, r *http.Request) {
 // agentToResponse converts an Agent CRD to an API response
 func agentToResponse(agent *kubeopenv1alpha1.Agent) types.AgentResponse {
 	resp := types.AgentResponse{
-		Name:             agent.Name,
-		Namespace:        agent.Namespace,
-		Profile:          agent.Spec.Profile,
-		ExecutorImage:    agent.Spec.ExecutorImage,
-		AgentImage:       agent.Spec.AgentImage,
+		Name:               agent.Name,
+		Namespace:          agent.Namespace,
+		Profile:            agent.Spec.Profile,
+		ExecutorImage:      agent.Spec.ExecutorImage,
+		AgentImage:         agent.Spec.AgentImage,
 		WorkspaceDir:       agent.Spec.WorkspaceDir,
 		ServiceAccountName: agent.Spec.ServiceAccountName,
 		ContextsCount:      len(agent.Spec.Contexts),
-		CredentialsCount: len(agent.Spec.Credentials),
-		CreatedAt:        agent.CreationTimestamp.Time,
-		Labels:           agent.Labels,
+		CredentialsCount:   len(agent.Spec.Credentials),
+		CreatedAt:          agent.CreationTimestamp.Time,
+		Labels:             agent.Labels,
 	}
 
 	if agent.Spec.TemplateRef != nil {

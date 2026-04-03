@@ -58,12 +58,12 @@ type CreateAgentRequest struct {
 	ExecutorImage string `json:"executorImage,omitempty"`
 
 	// P1: Common configuration
-	MaxConcurrentTasks *int32       `json:"maxConcurrentTasks,omitempty"`
-	Standby            *StandbyInfo `json:"standby,omitempty"`
+	MaxConcurrentTasks *int32                   `json:"maxConcurrentTasks,omitempty"`
+	Standby            *StandbyInfo             `json:"standby,omitempty"`
 	Persistence        *CreatePersistenceConfig `json:"persistence,omitempty"`
 
 	// P2: Advanced configuration
-	Port  *int32          `json:"port,omitempty"`
+	Port  *int32           `json:"port,omitempty"`
 	Proxy *ProxyConfigInfo `json:"proxy,omitempty"`
 }
 
@@ -206,14 +206,14 @@ type StandbyInfo struct {
 
 // ServerStatusInfo represents the status of an Agent's deployment
 type ServerStatusInfo struct {
-	DeploymentName  string               `json:"deploymentName,omitempty"`
-	ServiceName     string               `json:"serviceName,omitempty"`
-	URL             string               `json:"url,omitempty"`
-	Ready           bool                 `json:"ready"`
-	Port            int32                `json:"port,omitempty"`
-	Suspended       bool                 `json:"suspended"`
-	IdleSince       *time.Time           `json:"idleSince,omitempty"`
-	GitSyncStatuses []GitSyncStatusInfo  `json:"gitSyncStatuses,omitempty"`
+	DeploymentName  string              `json:"deploymentName,omitempty"`
+	ServiceName     string              `json:"serviceName,omitempty"`
+	URL             string              `json:"url,omitempty"`
+	Ready           bool                `json:"ready"`
+	Port            int32               `json:"port,omitempty"`
+	Suspended       bool                `json:"suspended"`
+	IdleSince       *time.Time          `json:"idleSince,omitempty"`
+	GitSyncStatuses []GitSyncStatusInfo `json:"gitSyncStatuses,omitempty"`
 }
 
 // GitSyncStatusInfo represents the sync state of a Git context
@@ -270,8 +270,8 @@ type CleanupConfig struct {
 
 // ProxyConfigInfo represents proxy configuration in API responses
 type ProxyConfigInfo struct {
-	HttpProxy  string `json:"httpProxy,omitempty"`
-	HttpsProxy string `json:"httpsProxy,omitempty"`
+	HttpProxy  string `json:"httpProxy,omitempty"`  //nolint:staticcheck,revive // JSON API field name convention
+	HttpsProxy string `json:"httpsProxy,omitempty"` //nolint:staticcheck,revive // JSON API field name convention
 	NoProxy    string `json:"noProxy,omitempty"`
 }
 
@@ -308,18 +308,18 @@ type CronTaskResponse struct {
 	Schedule                string               `json:"schedule"`
 	TimeZone                string               `json:"timeZone,omitempty"`
 	ConcurrencyPolicy       string               `json:"concurrencyPolicy"`
-	Suspend                 bool                  `json:"suspend"`
-	MaxRetainedTasks        int32                 `json:"maxRetainedTasks,omitempty"`
-	StartingDeadlineSeconds *int64                `json:"startingDeadlineSeconds,omitempty"`
-	Active                  int32                 `json:"active"`
-	LastScheduleTime        *time.Time            `json:"lastScheduleTime,omitempty"`
-	LastSuccessfulTime      *time.Time            `json:"lastSuccessfulTime,omitempty"`
-	NextScheduleTime        *time.Time            `json:"nextScheduleTime,omitempty"`
-	TotalExecutions         int64                 `json:"totalExecutions"`
-	TaskTemplate            CronTaskTemplateInfo  `json:"taskTemplate"`
-	CreatedAt               time.Time             `json:"createdAt"`
-	Labels                  map[string]string     `json:"labels,omitempty"`
-	Conditions              []Condition           `json:"conditions,omitempty"`
+	Suspend                 bool                 `json:"suspend"`
+	MaxRetainedTasks        int32                `json:"maxRetainedTasks,omitempty"`
+	StartingDeadlineSeconds *int64               `json:"startingDeadlineSeconds,omitempty"`
+	Active                  int32                `json:"active"`
+	LastScheduleTime        *time.Time           `json:"lastScheduleTime,omitempty"`
+	LastSuccessfulTime      *time.Time           `json:"lastSuccessfulTime,omitempty"`
+	NextScheduleTime        *time.Time           `json:"nextScheduleTime,omitempty"`
+	TotalExecutions         int64                `json:"totalExecutions"`
+	TaskTemplate            CronTaskTemplateInfo `json:"taskTemplate"`
+	CreatedAt               time.Time            `json:"createdAt"`
+	Labels                  map[string]string    `json:"labels,omitempty"`
+	Conditions              []Condition          `json:"conditions,omitempty"`
 }
 
 // CronTaskTemplateInfo represents the task template in CronTask responses

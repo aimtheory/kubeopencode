@@ -2986,7 +2986,7 @@ var _ = Describe("TaskController", func() {
 					ExecutorImage:      "quay.io/kubeopencode/kubeopencode-agent-devbox:latest",
 					WorkspaceDir:       "/workspace",
 					ServiceAccountName: "test-agent",
-					Port: 4096,
+					Port:               4096,
 				},
 			}
 			createReadyAgent(ctx, agent)

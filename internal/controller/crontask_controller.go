@@ -85,7 +85,7 @@ func (r *CronTaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	cronTask.Status.NextScheduleTime = &metav1.Time{Time: nextScheduleTime}
 
 	// Update active count and refs
-	cronTask.Status.Active = int32(len(activeTasks))
+	cronTask.Status.Active = int32(len(activeTasks)) //nolint:gosec // activeTasks count is bounded by maxRetainedTasks (default 10)
 	cronTask.Status.ActiveRefs = make([]corev1.ObjectReference, 0, len(activeTasks))
 	for _, t := range activeTasks {
 		cronTask.Status.ActiveRefs = append(cronTask.Status.ActiveRefs, corev1.ObjectReference{
@@ -290,7 +290,7 @@ func (r *CronTaskReconciler) isAtRetainedLimit(cronTask *kubeopenv1alpha1.CronTa
 	if cronTask.Spec.MaxRetainedTasks == nil {
 		return false
 	}
-	return int32(len(childTasks)) >= *cronTask.Spec.MaxRetainedTasks
+	return int32(len(childTasks)) >= *cronTask.Spec.MaxRetainedTasks //nolint:gosec // childTasks count is bounded by maxRetainedTasks
 }
 
 // getMostRecentScheduleTime returns the most recent unmet schedule time and how many were missed.
