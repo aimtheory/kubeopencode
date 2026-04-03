@@ -118,33 +118,7 @@ function HeroSection(): ReactNode {
   );
 }
 
-// Section 3: Demo placeholder
-function DemoSection(): ReactNode {
-  return (
-    <section id="demo" className={styles.section}>
-      <div className="container">
-        <div className={styles.sectionHeader}>
-          <Heading as="h2">See KubeOpenCode in Action</Heading>
-          <p className={styles.sectionSubtitle}>
-            Watch how AI agents run natively on Kubernetes with zero configuration overhead.
-          </p>
-        </div>
-        <div className={styles.demoPlaceholder}>
-          <div className={styles.demoPlaceholderInner}>
-            <div className={styles.demoPlayIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            </div>
-            <p className={styles.demoPlaceholderText}>Demo coming soon</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// Section 4: Features
+// Section 3: Features
 type FeatureItem = {
   title: string;
   icon: string;
@@ -158,28 +132,56 @@ const features: FeatureItem[] = [
     icon: '\u26A1',
     color: '#f59e0b',
     description:
-      'Every Agent runs as a persistent service on Kubernetes. Interactive terminal access, shared context across tasks, zero cold start \u2014 perfect for team-shared coding assistants.',
+      'Agents run as persistent Deployments with zero cold start. Shared context across tasks, session history survives restarts.',
   },
   {
-    title: 'Kubernetes-Native',
+    title: 'Web Terminal',
+    icon: '\uD83C\uDF10',
+    color: '#3b82f6',
+    description:
+      'Access any Agent directly from the browser via the built-in web terminal. Real-time interactive sessions without SSH or port-forwarding.',
+  },
+  {
+    title: 'Standby (Auto Suspend/Resume)',
+    icon: '\uD83D\uDCA4',
+    color: '#8b5cf6',
+    description:
+      'Agents auto-suspend after idle timeout, auto-resume when new Tasks arrive. Connection-aware \u2014 active sessions prevent suspension.',
+  },
+  {
+    title: 'CronTask',
+    icon: '\u23F0',
+    color: '#ec4899',
+    description:
+      'Scheduled and recurring task execution. Concurrency policies (Allow/Forbid/Replace), manual trigger support, and retention control.',
+  },
+  {
+    title: 'Git Auto-Sync',
+    icon: '\uD83D\uDD04',
+    color: '#10b981',
+    description:
+      'HotReload syncs Git contexts in-place without restart. Rollout policy triggers rolling updates with active Task protection.',
+  },
+  {
+    title: 'Concurrency & Quota',
+    icon: '\uD83D\uDCCA',
+    color: '#f97316',
+    description:
+      'Limit concurrent tasks per Agent and rate-limit task starts with sliding time windows. Tasks queue automatically when limits are reached.',
+  },
+  {
+    title: 'Skills',
+    icon: '\uD83E\uDDE9',
+    color: '#6366f1',
+    description:
+      'Reusable AI agent capabilities from Git repos. Share skills across Agents and templates, auto-injected as slash commands.',
+  },
+  {
+    title: 'Declarative CRDs',
     icon: '\u2638\uFE0F',
     color: '#326ce5',
     description:
-      'Declarative CRDs, GitOps-friendly, works with Helm, Kustomize, and ArgoCD. No new tools to learn \u2014 just kubectl apply.',
-  },
-  {
-    title: 'Enterprise Ready',
-    icon: '\uD83C\uDFE2',
-    color: '#10b981',
-    description:
-      'RBAC, private registries, corporate proxies, custom CA certificates, pod security policies, and audit-ready infrastructure for compliance.',
-  },
-  {
-    title: 'Built for Teams',
-    icon: '\uD83D\uDC65',
-    color: '#8b5cf6',
-    description:
-      'Shared agent configurations, batch operations, concurrency control, and centralized credential management for consistent standards.',
+      'Fully Kubernetes-native. GitOps-friendly, works with Helm, Kustomize, and ArgoCD. Just kubectl apply.',
   },
 ];
 
@@ -190,7 +192,7 @@ function FeaturesSection(): ReactNode {
         <div className={styles.sectionHeader}>
           <Heading as="h2">Features</Heading>
           <p className={styles.sectionSubtitle}>
-            Everything you need to run AI agents at scale on Kubernetes.
+            Concrete capabilities shipped in recent releases.
           </p>
         </div>
         <div className={styles.featuresGrid}>
@@ -463,7 +465,6 @@ export default function Home(): ReactNode {
       <AlphaBanner />
       <HeroSection />
       <main>
-        <DemoSection />
         <FeaturesSection />
         <HowItWorksSection />
         <ArchitectureSection />

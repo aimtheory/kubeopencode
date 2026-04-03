@@ -122,35 +122,6 @@
   margin: 0 auto;
 }
 
-/* Demo section */
-.demoPlaceholder {
-  max-width: 800px;
-  margin: 0 auto;
-  border: 2px dashed var(--ifm-color-emphasis-300);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.demoPlaceholderInner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 360px;
-  background: var(--ifm-background-surface-color);
-}
-
-.demoPlayIcon {
-  color: var(--ifm-color-emphasis-400);
-  margin-bottom: 1rem;
-}
-
-.demoPlaceholderText {
-  font-size: 1.1rem;
-  color: var(--ifm-color-emphasis-500);
-  margin: 0;
-}
-
 /* Features section */
 .featuresGrid {
   display: grid;
