@@ -141,8 +141,8 @@ The default setup uses the free `opencode/big-pickle` model. To switch to a paid
 
 ## Next Steps
 
+- [Setting Up an Agent](setting-up-agent.md) — Configure your own Agent: model selection, images, persistence, and more
 - [Features](features.md) — Learn about Live Agents (human-in-the-loop) and automated workflows
-- [Agent Images](agent-images.md) — Build custom agent images
 - [Security](security.md) — RBAC, credential management, and best practices
 - [Architecture](architecture.md) — System design and API reference
 

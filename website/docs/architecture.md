@@ -1,4 +1,4 @@
-# KubeOpenCode Architecture & API Design
+# Architecture & API Design
 
 ## Table of Contents
 

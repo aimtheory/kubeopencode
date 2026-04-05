@@ -306,5 +306,5 @@ See [Features - Enterprise Features](features.md#enterprise-features) for an ove
 
 - [Getting Started](getting-started.md) - Installation and basic usage
 - [Features](features.md) - Context system, concurrency, and more
-- [Agent Images](agent-images.md) - Build custom agent images
+- [Setting Up an Agent](setting-up-agent.md) - Agent configuration, images, and features
 - [Architecture](architecture.md) - System design and API reference

@@ -1,4 +1,4 @@
-# KubeOpenCode Features
+# Features
 
 This document covers the key features of KubeOpenCode.
 
@@ -1066,6 +1066,6 @@ The Agent detail page shows a **Suspend/Resume** button, and the agents list sho
 ## Next Steps
 
 - [Getting Started](getting-started.md) - Installation and basic usage
-- [Agent Images](agent-images.md) - Build custom agent images
+- [Setting Up an Agent](setting-up-agent.md) - Agent configuration, images, and features
 - [Security](security.md) - RBAC, credential management, and best practices
 - [Architecture](architecture.md) - System design and API reference

@@ -77,8 +77,6 @@ const config: Config = {
           position: 'left',
           label: 'Docs',
         },
-        {to: '/#features', label: 'Features', position: 'left'},
-        {to: '/#faq', label: 'FAQ', position: 'left'},
         {to: '/blog', label: 'Blog', position: 'left'},
         {
           href: 'https://github.com/kubeopencode/kubeopencode',

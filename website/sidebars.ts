@@ -3,8 +3,8 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'getting-started',
+    'setting-up-agent',
     'features',
-    'agent-images',
     'architecture',
     'security',
     {
