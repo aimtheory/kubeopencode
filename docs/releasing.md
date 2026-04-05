@@ -177,8 +177,8 @@ docker pull quay.io/kubeopencode/kubeopencode:vNEW_VERSION
 docker run --rm quay.io/kubeopencode/kubeopencode:vNEW_VERSION version
 # Expected output: kubeopencode version NEW_VERSION
 
-# Verify Helm chart
-helm pull oci://quay.io/kubeopencode/helm-charts/kubeopencode --version NEW_VERSION
+# Verify Helm chart (download to .output to avoid polluting the project directory)
+helm pull oci://quay.io/kubeopencode/helm-charts/kubeopencode --version NEW_VERSION --destination .output
 
 # Test Helm install (dry-run)
 helm install kubeopencode oci://quay.io/kubeopencode/helm-charts/kubeopencode \

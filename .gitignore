@@ -18,6 +18,9 @@ cover.out
 # Helm
 dist/
 
+# Temporary output (release verification, etc.)
+.output/
+
 # Node
 node_modules/
 
