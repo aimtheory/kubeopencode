@@ -305,8 +305,12 @@ func runAgentAttachServiceProxy(ctx context.Context, namespace, agentName string
 	heartbeatCancel := startConnectionHeartbeat(ctx, k8sClient, namespace, agentName)
 	defer heartbeatCancel()
 
-	// Launch opencode attach
-	attachCmd := exec.CommandContext(ctx, "opencode", "attach", localURL) //nolint:gosec // args are not user-controlled
+	// Launch opencode attach from the Agent workspace directory when configured.
+	attachArgs := []string{"attach", localURL}
+	if agent.Spec.WorkspaceDir != "" {
+		attachArgs = append(attachArgs, "--dir", agent.Spec.WorkspaceDir)
+	}
+	attachCmd := exec.CommandContext(ctx, "opencode", attachArgs...) //nolint:gosec // args are not user-controlled
 	attachCmd.Stdin = os.Stdin
 	attachCmd.Stdout = os.Stdout
 	attachCmd.Stderr = os.Stderr
@@ -411,7 +415,11 @@ func runAgentAttachPortForward(ctx context.Context, namespace, agentName string,
 	heartbeatCancel := startConnectionHeartbeat(ctx, k8sClient, namespace, agentName)
 	defer heartbeatCancel()
 
-	attachCmd := exec.CommandContext(ctx, "opencode", "attach", localURL) //nolint:gosec // args are not user-controlled
+	attachArgs := []string{"attach", localURL}
+	if agent.Spec.WorkspaceDir != "" {
+		attachArgs = append(attachArgs, "--dir", agent.Spec.WorkspaceDir)
+	}
+	attachCmd := exec.CommandContext(ctx, "opencode", attachArgs...) //nolint:gosec // args are not user-controlled
 	attachCmd.Stdin = os.Stdin
 	attachCmd.Stdout = os.Stdout
 	attachCmd.Stderr = os.Stderr
