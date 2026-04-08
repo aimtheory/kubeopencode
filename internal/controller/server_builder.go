@@ -43,6 +43,18 @@ const (
 	// ServerSessionDBPath is the full path to the OpenCode session database.
 	ServerSessionDBPath = ServerSessionMountPath + "/opencode.db"
 
+	// ServerPersistentHomeDir is the HOME directory for persisted server-mode agents.
+	ServerPersistentHomeDir = ServerSessionMountPath + "/home"
+
+	// ServerPersistentXDGConfigHome is the XDG config root for persisted server-mode agents.
+	ServerPersistentXDGConfigHome = ServerSessionMountPath + "/.config"
+
+	// ServerPersistentXDGDataHome is the XDG data root for persisted server-mode agents.
+	ServerPersistentXDGDataHome = ServerSessionMountPath + "/.local/share"
+
+	// ServerPersistentXDGStateHome is the XDG state root for persisted server-mode agents.
+	ServerPersistentXDGStateHome = ServerSessionMountPath + "/.local/state"
+
 	// DefaultSessionPVCSize is the default size for the session PVC.
 	DefaultSessionPVCSize = "1Gi"
 
@@ -244,6 +256,12 @@ func BuildServerDeployment(agent *kubeopenv1alpha1.Agent, agentCfg agentConfig, 
 			Name:  OpenCodeDBEnvVar,
 			Value: ServerSessionDBPath,
 		})
+		envVars = append(envVars,
+			corev1.EnvVar{Name: "HOME", Value: ServerPersistentHomeDir},
+			corev1.EnvVar{Name: "XDG_CONFIG_HOME", Value: ServerPersistentXDGConfigHome},
+			corev1.EnvVar{Name: "XDG_DATA_HOME", Value: ServerPersistentXDGDataHome},
+			corev1.EnvVar{Name: "XDG_STATE_HOME", Value: ServerPersistentXDGStateHome},
+		)
 	}
 
 	// Add credentials (secrets as env vars or file mounts)

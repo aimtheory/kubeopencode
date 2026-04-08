@@ -253,6 +253,54 @@ func TestBuildServerDeployment_WithHOMEAndSHELLEnvVars(t *testing.T) {
 	}
 }
 
+func TestBuildServerDeployment_WithSessionPersistenceUsesPersistentHomeAndXDG(t *testing.T) {
+	agent := &kubeopenv1alpha1.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-agent",
+			Namespace: "default",
+		},
+		Spec: kubeopenv1alpha1.AgentSpec{
+			Port: 4096,
+			Persistence: &kubeopenv1alpha1.PersistenceConfig{
+				Sessions: &kubeopenv1alpha1.VolumePersistence{},
+			},
+		},
+	}
+
+	cfg := agentConfig{
+		executorImage: "test-executor:v1.0.0",
+		agentImage:    "test-agent:v1.0.0",
+		workspaceDir:  "/workspace",
+	}
+
+	deployment := BuildServerDeployment(agent, cfg, defaultSystemConfig(), nil, nil, nil, nil, nil)
+	if deployment == nil {
+		t.Fatal("BuildServerDeployment returned nil")
+	}
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	envMap := make(map[string]string, len(container.Env))
+	for _, env := range container.Env {
+		envMap[env.Name] = env.Value
+	}
+
+	if got := envMap["HOME"]; got != ServerPersistentHomeDir {
+		t.Errorf("HOME = %q, want %q", got, ServerPersistentHomeDir)
+	}
+	if got := envMap["XDG_CONFIG_HOME"]; got != ServerPersistentXDGConfigHome {
+		t.Errorf("XDG_CONFIG_HOME = %q, want %q", got, ServerPersistentXDGConfigHome)
+	}
+	if got := envMap["XDG_DATA_HOME"]; got != ServerPersistentXDGDataHome {
+		t.Errorf("XDG_DATA_HOME = %q, want %q", got, ServerPersistentXDGDataHome)
+	}
+	if got := envMap["XDG_STATE_HOME"]; got != ServerPersistentXDGStateHome {
+		t.Errorf("XDG_STATE_HOME = %q, want %q", got, ServerPersistentXDGStateHome)
+	}
+	if got := envMap["SHELL"]; got != DefaultShell {
+		t.Errorf("SHELL = %q, want %q", got, DefaultShell)
+	}
+}
+
 func TestBuildServerDeployment_WithTextContext(t *testing.T) {
 	agent := &kubeopenv1alpha1.Agent{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1085,7 +1133,9 @@ func TestBuildServerDeployment_WithSessionPersistence(t *testing.T) {
 
 	// Verify OPENCODE_DB env var
 	var foundEnv bool
+	envMap := make(map[string]string, len(container.Env))
 	for _, env := range container.Env {
+		envMap[env.Name] = env.Value
 		if env.Name == OpenCodeDBEnvVar {
 			foundEnv = true
 			if env.Value != ServerSessionDBPath {
@@ -1095,6 +1145,18 @@ func TestBuildServerDeployment_WithSessionPersistence(t *testing.T) {
 	}
 	if !foundEnv {
 		t.Errorf("%s env var not found", OpenCodeDBEnvVar)
+	}
+	if got := envMap["HOME"]; got != ServerPersistentHomeDir {
+		t.Errorf("HOME = %q, want %q", got, ServerPersistentHomeDir)
+	}
+	if got := envMap["XDG_CONFIG_HOME"]; got != ServerPersistentXDGConfigHome {
+		t.Errorf("XDG_CONFIG_HOME = %q, want %q", got, ServerPersistentXDGConfigHome)
+	}
+	if got := envMap["XDG_DATA_HOME"]; got != ServerPersistentXDGDataHome {
+		t.Errorf("XDG_DATA_HOME = %q, want %q", got, ServerPersistentXDGDataHome)
+	}
+	if got := envMap["XDG_STATE_HOME"]; got != ServerPersistentXDGStateHome {
+		t.Errorf("XDG_STATE_HOME = %q, want %q", got, ServerPersistentXDGStateHome)
 	}
 }
 
@@ -1129,10 +1191,24 @@ func TestBuildServerDeployment_WithoutSessionPersistence(t *testing.T) {
 
 	// Verify no OPENCODE_DB env var
 	container := deployment.Spec.Template.Spec.Containers[0]
+	envMap := make(map[string]string, len(container.Env))
 	for _, env := range container.Env {
+		envMap[env.Name] = env.Value
 		if env.Name == OpenCodeDBEnvVar {
 			t.Errorf("%s env var should not be present without persistence config", OpenCodeDBEnvVar)
 		}
+	}
+	if got := envMap["HOME"]; got != DefaultHomeDir {
+		t.Errorf("HOME = %q, want %q", got, DefaultHomeDir)
+	}
+	if _, ok := envMap["XDG_CONFIG_HOME"]; ok {
+		t.Errorf("XDG_CONFIG_HOME should not be set without session persistence")
+	}
+	if _, ok := envMap["XDG_DATA_HOME"]; ok {
+		t.Errorf("XDG_DATA_HOME should not be set without session persistence")
+	}
+	if _, ok := envMap["XDG_STATE_HOME"]; ok {
+		t.Errorf("XDG_STATE_HOME should not be set without session persistence")
 	}
 }
 
